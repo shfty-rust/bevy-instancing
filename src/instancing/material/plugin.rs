@@ -12,7 +12,7 @@ use bevy::{
     },
     pbr::{AlphaMode, MeshPipelineKey, SetMeshViewBindGroup},
     prelude::{
-        debug, default, error, Assets, Commands, Deref, DerefMut, Entity, Handle, Mesh,
+        debug, default, error, info, Assets, Commands, Deref, DerefMut, Entity, Handle, Mesh,
         ParallelSystemDescriptorCoercion, With,
     },
     render::{
@@ -498,7 +498,10 @@ pub fn prepare_view_instances<M: SpecializedInstancedMaterial>(
     >,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
 ) {
+    info!("prepare_view_instances<{}>", std::any::type_name::<M>());
+
     for (view_entity, visible_entities) in query_views.iter() {
+        info!("View {view_entity:?}");
         instance_view_meta.get_mut(&view_entity).unwrap().instances = visible_entities
             .entities
             .iter()
@@ -513,7 +516,10 @@ pub fn prepare_view_instance_blocks<M: SpecializedInstancedMaterial>(
     query_instance_block: Query<Entity, (With<Handle<M>>, With<InstanceBlock>)>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
 ) {
+    info!("prepare_view_instance_blocks<{}>", std::any::type_name::<M>());
+
     for (view_entity, visible_entities) in query_views.iter() {
+        info!("View {view_entity:?}");
         instance_view_meta
             .get_mut(&view_entity)
             .unwrap()
@@ -539,9 +545,12 @@ pub fn prepare_mesh_batches<M: SpecializedInstancedMaterial>(
 ) where
     M::Key: PartialOrd + Ord + std::fmt::Debug,
 {
+    info!("prepare_mesh_batches<{}>", std::any::type_name::<M>());
+
     let render_meshes = &render_meshes.instanced_meshes;
 
     for view_entity in query_views.iter() {
+        info!("View {view_entity:?}");
         let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
 
         // Collect set of visible meshes
@@ -693,11 +702,12 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
 ) where
     M::Key: PartialOrd + Ord + std::fmt::Debug,
 {
-    debug!("prepare_instance_batches<{}>", std::any::type_name::<M>());
+    info!("prepare_instance_batches<{}>", std::any::type_name::<M>());
 
     let render_meshes = &render_meshes.instanced_meshes;
 
     for (view_entity, view) in query_views.iter_mut() {
+        info!("View {view_entity:?}");
         let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
 
         // Fetch view matrix for sorting
@@ -937,7 +947,13 @@ pub fn prepare_material_batches<M: SpecializedInstancedMaterial>(
     )>,
     query_instance_block: Query<(Entity, &Handle<M>, &InstanceBlock)>,
 ) {
+    info!(
+        "prepare_instanced_material_batches<{}>",
+        std::any::type_name::<M>()
+    );
+
     for view_entity in query_views.iter_mut() {
+        info!("View {view_entity:?}");
         let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
 
         // Collect set of visible materials
@@ -990,7 +1006,7 @@ pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
 ) where
     M::Key: PartialOrd + Ord + std::fmt::Debug,
 {
-    debug!(
+    info!(
         "prepare_instanced_materials<{}>",
         std::any::type_name::<M>()
     );
@@ -998,6 +1014,7 @@ pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
     let render_meshes = &render_meshes.instanced_meshes;
 
     for view_entity in query_views.iter_mut() {
+        info!("View {view_entity:?}");
         let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
 
         // Collect set of visible materials
@@ -1284,9 +1301,10 @@ pub fn queue_instanced_materials<M: SpecializedInstancedMaterial>(
 ) where
     M::Key: PartialOrd + Ord + std::fmt::Debug,
 {
-    debug!("queue_instanced_materials<{}>", std::any::type_name::<M>());
+    info!("queue_instanced_materials<{}>", std::any::type_name::<M>());
 
     for (view_entity, instance_meta) in instance_view_meta.iter() {
+        info!("View {view_entity:?}");
         for (key, batched_instances) in &instance_meta.batched_instances {
             let batch_entity = batched_instances.batch_entity;
 
@@ -1333,7 +1351,7 @@ pub fn queue_instanced_materials<M: SpecializedInstancedMaterial>(
             let distance = 0.0;
             match key.material_key.alpha_mode {
                 GpuAlphaMode::Opaque => {
-                    debug!("Queuing opaque instanced draw {batch_entity:?}");
+                    info!("Queuing opaque instanced draw {batch_entity:?}");
                     let mut opaque_phase = query_opaque_3d.get_mut(*view_entity).unwrap();
                     opaque_phase.add(Opaque3d {
                         entity: batch_entity,
@@ -1343,7 +1361,7 @@ pub fn queue_instanced_materials<M: SpecializedInstancedMaterial>(
                     });
                 }
                 GpuAlphaMode::Mask => {
-                    debug!("Queuing masked instanced draw {batch_entity:?}");
+                    info!("Queuing masked instanced draw {batch_entity:?}");
                     let mut alpha_mask_phase = query_alpha_mask_3d.get_mut(*view_entity).unwrap();
                     alpha_mask_phase.add(AlphaMask3d {
                         entity: batch_entity,
@@ -1353,7 +1371,7 @@ pub fn queue_instanced_materials<M: SpecializedInstancedMaterial>(
                     });
                 }
                 GpuAlphaMode::Blend => {
-                    debug!("Queuing transparent instanced draw {batch_entity:?}");
+                    info!("Queuing transparent instanced draw {batch_entity:?}");
                     let mut transparent_phase = query_transparent_3d.get_mut(*view_entity).unwrap();
                     transparent_phase.add(Transparent3d {
                         entity: batch_entity,
@@ -1387,7 +1405,7 @@ impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstanc
         (instance_meta, query_instance_batch_key): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        debug!("DrawInstanceBatch {item:?}");
+        info!("DrawInstanceBatch {item:?}");
         let batched_instances = instance_meta
             .into_inner()
             .get(&view)
@@ -1403,7 +1421,7 @@ impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstanc
                 pass.set_index_buffer(index_buffer.slice(..), 0, *index_format);
 
                 for i in &batched_instances.indirect_indices {
-                    debug!("Drawing indexed indirect {i:?}");
+                    info!("Drawing indexed indirect {i:?}");
                     pass.draw_indexed_indirect(
                         &batched_instances.indirect_buffer,
                         (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
@@ -1412,7 +1430,7 @@ impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstanc
             }
             None => {
                 for i in &batched_instances.indirect_indices {
-                    debug!("Drawing indirect {i:?}");
+                    info!("Drawing indirect {i:?}");
                     pass.draw_indirect(
                         &batched_instances.indirect_buffer,
                         (i * std::mem::size_of::<DrawIndirect>()) as u64,

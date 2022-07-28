@@ -21,6 +21,7 @@ pub const INDIRECT_STRUCT_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 7281773422344927676);
 
 /// Plugin encapsulating instanced mesh rendering
+#[derive(Debug, Default, Copy, Clone)]
 pub struct IndirectRenderingPlugin;
 
 impl Plugin for IndirectRenderingPlugin {
