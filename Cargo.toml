@@ -1,0 +1,8 @@
+[package]
+name = "bevy_instancing"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.7"
+bytemuck = "1.11.0"
