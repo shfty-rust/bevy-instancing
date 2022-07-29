@@ -1,3 +1,6 @@
+TODO: Standalone example for InstanceBlock
+      * Run compute animations over a few different mesh / material block permutations
+
 TODO: Investigate spliting SpecializedInstancedMaterial::Key into InstanceKey and PipelineKey
       * Currently coupling pipelines to mutually compatible sets of materials
         * i.e. Materials that share both a bind group and parameter values
