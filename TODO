@@ -1,0 +1,30 @@
+TODO: Implement StandardInstancedMaterial
+      * Initial goal: Make pbr.wgsl work with instances
+        * Should be able to encode most StandardMaterial params as instance data
+      * Secondary goal: Make shadows work
+        * This may be better left until posting on the bevy github
+
+TODO: Investigate spliting SpecializedInstancedMaterial::Key into InstanceKey and PipelineKey
+      * Currently coupling pipelines to mutually compatible sets of materials
+        * i.e. Materials that share both a bind group and parameter values
+      * In theory pipelines should be able to key separately, resulting in less duplication
+
+TODO: Optimization pass for instanced mesh batcher
+
+TODO: Use BufferVec to cache batch data inside InstanceMeta
+      * Avoid clearing every draw
+        * Instead, prune empty buffers
+      * Should be able to avoid unnecessary writes on frames where the
+        buffer data for a given key doesn't change
+        * Seems important, since the act of writing data to the GPU is what indirect avoids
+
+TODO: Specialization for compute shaders that operate on a MeshInstanceBlock
+      * Effectively a generalization of the current board compute module
+      * Should resemble SpecializedInstancedMaterial
+      * InstanceComputeKernel?
+
+TODO: Uniform support for instance buffer
+      * Need to split instances into
+        (std::mem::size_of::<InstanceData>() / MAX_UNIFORM_BUFFER_SIZE) sub-batches,
+        introduce additional draw calls
+
