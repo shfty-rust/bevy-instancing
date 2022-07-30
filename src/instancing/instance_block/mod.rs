@@ -1,3 +1,5 @@
+pub mod instance_block_bundle;
+
 use bevy::{
     ecs::{reflect::ReflectComponent, system::lifetimeless::Read},
     prelude::Component,

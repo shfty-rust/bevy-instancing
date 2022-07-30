@@ -20,10 +20,10 @@ use std::hash::Hash;
 /// should be used for materials that do not need specialization. [`Material`] types automatically implement [`SpecializedMaterial`].
 pub trait SpecializedInstancedMaterial: RenderAsset + Sized {
     /// The key used to specialize this material's [`RenderPipelineDescriptor`].
-    type PipelineKey: PartialEq + Eq + Hash + Clone + Send + Sync;
+    type PipelineKey: std::fmt::Debug + PartialEq + Eq + Hash + Clone + Send + Sync;
 
     /// The key used to batch instances of this material together
-    type BatchKey: PartialEq + Eq + PartialOrd + Ord + Hash + Clone + Send + Sync;
+    type BatchKey: std::fmt::Debug + PartialOrd + Ord + Clone + Send + Sync;
 
     /// Type used to store per-instance data
     type Instance: Instance;

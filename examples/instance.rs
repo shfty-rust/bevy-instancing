@@ -5,9 +5,9 @@ use bevy::{
     pbr::{AlphaMode, DirectionalLight, DirectionalLightBundle},
     prelude::{
         default,
-        shape::{Cube, Icosphere},
-        App, Assets, Camera, Color, Commands, Component, EventWriter, Handle, Mesh,
-        PerspectiveCameraBundle, Plugin, Res, ResMut, Transform, World,
+        shape::{Cube, Icosphere, Quad, Torus, UVSphere},
+        App, AssetServer, Assets, Camera, Color, Commands, Component, EventWriter, Handle, Mesh,
+        PerspectiveCameraBundle, PerspectiveProjection, Plugin, Res, ResMut, Transform, World,
     },
     render::{
         camera::{ActiveCamera, Camera3d, CameraTypePlugin, RenderTarget},
@@ -22,8 +22,11 @@ use bevy::{
 };
 
 use bevy_instancing::prelude::{
-    BasicMaterial, CustomInstanceBundle, CustomMaterial, IndirectRenderingPlugin, InstanceBundle, CustomMaterialPlugin,
+    BasicMaterial, BasicMaterialPlugin, ColorInstanceBundle, CustomMaterial, CustomMaterialPlugin,
+    IndirectRenderingPlugin, MeshInstanceBundle, TextureMaterial, TextureMaterialPlugin,
 };
+
+const USE_SECOND_CAMERA: bool = false;
 
 // Test indirect rendering
 fn main() {
@@ -32,7 +35,9 @@ fn main() {
     app.add_plugins(DefaultPlugins)
         .add_plugin(SecondWindowCameraPlugin)
         .add_plugin(IndirectRenderingPlugin)
-        .add_plugin(CustomMaterialPlugin);
+        .add_plugin(BasicMaterialPlugin)
+        .add_plugin(CustomMaterialPlugin)
+        .add_plugin(TextureMaterialPlugin);
 
     app.add_startup_system(setup_instancing);
 
@@ -104,16 +109,23 @@ fn extract_second_camera_phases(
 struct SecondWindowCamera3d;
 
 fn setup_instancing(
+    asset_server: Res<AssetServer>,
     mut create_window_events: EventWriter<CreateWindow>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut board_materials: ResMut<Assets<CustomMaterial>>,
+    mut texture_materials: ResMut<Assets<TextureMaterial>>,
     mut commands: Commands,
 ) {
     let window_id = WindowId::new();
 
     // Perspective camera
     commands.spawn_bundle(PerspectiveCameraBundle::<Camera3d> {
-        transform: Transform::from_xyz(-50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(-50.0, 50.0, 50.0)
+            .looking_at(Vec3::new(0.0, 12.0, 0.0), Vec3::Y),
+        perspective_projection: PerspectiveProjection {
+            fov: 15.0f32.to_radians(),
+            ..default()
+        },
         ..PerspectiveCameraBundle::new()
     });
 
@@ -131,40 +143,72 @@ fn setup_instancing(
         ..default()
     });
 
-    // sends out a "CreateWindow" event, which will be received by the windowing backend
-    create_window_events.send(CreateWindow {
-        id: window_id,
-        descriptor: WindowDescriptor {
-            width: 800.,
-            height: 600.,
-            present_mode: PresentMode::Immediate,
-            title: "Second window".to_string(),
-            ..default()
-        },
-    });
+    if USE_SECOND_CAMERA {
+        // sends out a "CreateWindow" event, which will be received by the windowing backend
+        create_window_events.send(CreateWindow {
+            id: window_id,
+            descriptor: WindowDescriptor {
+                width: 800.,
+                height: 600.,
+                present_mode: PresentMode::Immediate,
+                title: "Second window".to_string(),
+                ..default()
+            },
+        });
 
-    // second window camera
-    commands.spawn_bundle(PerspectiveCameraBundle {
-        camera: Camera {
-            target: RenderTarget::Window(window_id),
-            ..default()
-        },
-        transform: Transform::from_xyz(50.0, 0.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-        marker: SecondWindowCamera3d,
-        ..PerspectiveCameraBundle::new()
-    });
+        // second window camera
+        commands.spawn_bundle(PerspectiveCameraBundle {
+            camera: Camera {
+                target: RenderTarget::Window(window_id),
+                ..default()
+            },
+            perspective_projection: PerspectiveProjection {
+                fov: 15.0f32.to_radians(),
+                ..default()
+            },
+            transform: Transform::from_xyz(50.0, 0.0, 50.0)
+                .looking_at(Vec3::new(0.0, 12.0, 0.0), Vec3::Y),
+            marker: SecondWindowCamera3d,
+            ..PerspectiveCameraBundle::new()
+        });
+    }
 
     // Populate scene
     let mesh_cube = meshes.add(Cube::default().into());
-    let mesh_sphere = meshes.add(
+    let mesh_quad = meshes.add(Quad::default().into());
+
+    let mesh_icosphere = meshes.add(
         Icosphere {
-            radius: 0.75,
+            radius: 0.5,
             ..default()
         }
         .into(),
     );
 
-    let meshes = [mesh_cube, mesh_sphere];
+    let mesh_uv_sphere = meshes.add(
+        UVSphere {
+            radius: 0.5,
+            ..default()
+        }
+        .into(),
+    );
+
+    let mesh_torus = meshes.add(
+        Torus {
+            radius: 0.25 + 0.125,
+            ring_radius: 0.125,
+            ..default()
+        }
+        .into(),
+    );
+
+    let meshes = [
+        mesh_cube,
+        mesh_quad,
+        mesh_icosphere,
+        mesh_uv_sphere,
+        mesh_torus,
+    ];
 
     let material_basic = Handle::<BasicMaterial>::default();
 
@@ -213,50 +257,75 @@ fn setup_instancing(
         cull_mode: Some(Face::Back),
     });
 
-    let materials = [
+    let custom_materials: &[Handle<CustomMaterial>] = &[
         material_opaque_no_cull,
         material_mask_no_cull,
-        material_blend_no_cull.clone(),
+        material_blend_no_cull,
         material_opaque_cull_front,
         material_mask_cull_front,
-        material_blend_cull_front.clone(),
+        material_blend_cull_front,
         material_opaque_cull_back,
         material_mask_cull_back,
-        material_blend_cull_back.clone(),
+        material_blend_cull_back,
     ];
 
-    let colors = [
-        Color::WHITE,
-        Color::RED,
-        Color::GREEN,
+    let material_texture_1 = texture_materials.add(TextureMaterial {
+        texture: asset_server.load("texture/text_1.png"),
+        alpha_mode: AlphaMode::Opaque,
+        cull_mode: Some(Face::Back),
+    });
+
+    let material_texture_2 = texture_materials.add(TextureMaterial {
+        texture: asset_server.load("texture/text_2.png"),
+        alpha_mode: AlphaMode::Mask(0.2),
+        cull_mode: Some(Face::Back),
+    });
+
+    let material_texture_3 = texture_materials.add(TextureMaterial {
+        texture: asset_server.load("texture/text_3.png"),
+        alpha_mode: AlphaMode::Blend,
+        cull_mode: Some(Face::Back),
+    });
+
+    let material_texture_smiley = texture_materials.add(TextureMaterial {
+        texture: asset_server.load("texture/text_smiley.png"),
+        alpha_mode: AlphaMode::Opaque,
+        cull_mode: Some(Face::Back),
+    });
+
+    let texture_materials = &[
+        material_texture_1,
+        material_texture_2,
+        material_texture_3,
+        material_texture_smiley,
+    ];
+
+    let colors = &[
+        Color::rgba(1.0, 1.0, 1.0, 0.5),
+        Color::rgba(1.0, 0.0, 0.0, 0.5),
+        Color::rgba(0.0, 1.0, 0.0, 0.5),
         Color::BLUE,
-        Color::BLACK,
     ];
 
     for (x, mesh) in meshes.into_iter().enumerate() {
         commands
             .spawn()
-            .insert(Name::new("Cube Instance"))
-            .insert_bundle(InstanceBundle::<BasicMaterial> {
+            .insert(Name::new("Basic Instance"))
+            .insert_bundle(MeshInstanceBundle::<BasicMaterial> {
                 mesh: mesh.clone(),
                 material: material_basic.clone(),
                 transform: Transform::from_xyz(x as f32 * 1.5, 0.0, 0.0).into(),
                 ..default()
             });
 
-        for (y, material) in materials.iter().enumerate() {
-            for (z, mut color) in colors.into_iter().enumerate() {
-                if *material == material_blend_no_cull
-                    || *material == material_blend_cull_front
-                    || *material == material_blend_cull_back
-                {
-                    color.set_a(0.5);
-                }
+        for (z, color) in colors.into_iter().copied().enumerate() {
+            let mut y = 0;
+            for material in custom_materials.iter() {
                 commands
                     .spawn()
-                    .insert(Name::new(format!("Cube Instance ({x:}, {y:}, {z:})")))
-                    .insert_bundle(CustomInstanceBundle {
-                        instance_bundle: InstanceBundle {
+                    .insert(Name::new(format!("Custom Instance ({x:}, {y:}, {z:})")))
+                    .insert_bundle(ColorInstanceBundle {
+                        instance_bundle: MeshInstanceBundle {
                             mesh: mesh.clone(),
                             material: material.clone(),
                             transform: Transform::from_xyz(
@@ -269,6 +338,30 @@ fn setup_instancing(
                         },
                         mesh_instance_color: color.into(),
                     });
+
+                y += 1;
+            }
+
+            for material in texture_materials.iter() {
+                commands
+                    .spawn()
+                    .insert(Name::new(format!("Texture Instance ({x:}, {y:}, {z:})")))
+                    .insert_bundle(ColorInstanceBundle {
+                        instance_bundle: MeshInstanceBundle {
+                            mesh: mesh.clone(),
+                            material: material.clone(),
+                            transform: Transform::from_xyz(
+                                x as f32 * 1.5,
+                                1.5 + y as f32 * 1.5,
+                                z as f32 * -1.5,
+                            )
+                            .into(),
+                            ..default()
+                        },
+                        mesh_instance_color: color.into(),
+                    });
+
+                y += 1;
             }
         }
     }

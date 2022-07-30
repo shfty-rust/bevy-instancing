@@ -19,6 +19,8 @@ struct UniformData {
     _: f32;
     tangent: vec3<f32>;
     _: f32;
+    tint: vec3<f32>;
+    _: f32;
 };
 
 [[group(0), binding(0)]]
@@ -57,5 +59,5 @@ fn instances([[builtin(global_invocation_id)]] invocation_id: vec3<u32>) {
         vec4<f32>(0.0, 0.0, 1.0, 0.0),
         vec4<f32>(pos, 1.0),
     );
-    out_instances.instances[instance_idx].color = vec4<f32>(abs(in_uniform.normal), abs(f));
+    out_instances.instances[instance_idx].color = vec4<f32>(in_uniform.tint, abs(f));
 }

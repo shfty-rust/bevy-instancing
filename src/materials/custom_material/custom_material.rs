@@ -15,7 +15,7 @@ use bevy::{
 };
 
 use crate::prelude::{
-    InstancedMaterialPipeline, SpecializedInstancedMaterial, CUSTOM_SHADER_HANDLE, CustomMeshInstance,
+    InstancedMaterialPipeline, SpecializedInstancedMaterial, CUSTOM_SHADER_HANDLE, ColorMeshInstance,
 };
 
 #[derive(Debug, Clone, TypeUuid)]
@@ -91,7 +91,7 @@ impl Ord for CustomMaterialKey {
 impl SpecializedInstancedMaterial for CustomMaterial {
     type PipelineKey = CustomMaterialKey;
     type BatchKey = CustomMaterialKey;
-    type Instance = CustomMeshInstance;
+    type Instance = ColorMeshInstance;
 
     fn pipeline_key(render_asset: &<CustomMaterial as RenderAsset>::PreparedAsset) -> Self::BatchKey {
         CustomMaterialKey {

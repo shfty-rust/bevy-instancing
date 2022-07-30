@@ -5,16 +5,16 @@ use bevy::{
 
 #[derive(Debug, Default, Copy, Clone, Deref, DerefMut, Component, Reflect)]
 #[reflect(Component)]
-pub struct MeshInstanceColor(pub Color);
+pub struct InstanceColor(pub Color);
 
-impl From<Color> for MeshInstanceColor {
+impl From<Color> for InstanceColor {
     fn from(color: Color) -> Self {
-        MeshInstanceColor(color)
+        InstanceColor(color)
     }
 }
 
-impl From<MeshInstanceColor> for Color {
-    fn from(color: MeshInstanceColor) -> Self {
+impl From<InstanceColor> for Color {
+    fn from(color: InstanceColor) -> Self {
         color.0
     }
 }

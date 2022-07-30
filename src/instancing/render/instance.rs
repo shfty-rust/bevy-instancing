@@ -8,7 +8,7 @@ use bytemuck::Pod;
 pub type ReadOnlyQueryItem<'w, 's, Q> = <<Q as WorldQuery>::ReadOnlyFetch as Fetch<'w, 's>>::Item;
 
 pub trait Instance {
-    type ExtractedInstance: Component;
+    type ExtractedInstance: std::fmt::Debug + Component;
     type PreparedInstance: Default + Clone + Send + Sync + Pod;
     type Query: WorldQuery;
 

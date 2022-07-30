@@ -1,3 +1,5 @@
+pub mod plugin;
+
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     reflect::TypeUuid,

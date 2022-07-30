@@ -1,5 +1,6 @@
-TODO: Texture-consuming instanced material and accompanying example scene
-      * Need to prove concept w.r.t. BatchKey allowing different bindings to work with the same pipeline
+TODO: Remove transform function from Instance trait, use component query instead
+
+TODO: Investigate replacing Instance trait with ExtractComponent
 
 TODO: Uniform support for instance buffer
       * Need to split instances into

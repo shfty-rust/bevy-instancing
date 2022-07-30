@@ -13,7 +13,8 @@ use bevy::asset as bevy_asset;
 use bevy::core::Time;
 use bevy::core_pipeline::node::MAIN_PASS_DEPENDENCIES;
 use bevy::ecs::system::lifetimeless::Read;
-use bevy::prelude::{info, Component, Entity, FromWorld, Handle, Query, Res, With, World};
+use bevy::math::Vec4;
+use bevy::prelude::{info, Component, Entity, FromWorld, Handle, Query, Res, With, World, Color};
 use bevy::reflect::TypeUuid;
 use bevy::render::render_component::{ExtractComponent, ExtractComponentPlugin};
 use bevy::render::render_graph::{Node, NodeLabel, RenderGraph};
@@ -21,7 +22,7 @@ use bevy::render::render_resource::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, BufferBinding, BufferBindingType,
     BufferInitDescriptor, BufferUsages, CachedComputePipelineId, ComputePassDescriptor,
-    ComputePipelineDescriptor, PipelineCache, ShaderStages, Face,
+    ComputePipelineDescriptor, Face, PipelineCache, ShaderStages,
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::{RenderApp, RenderStage};
@@ -41,9 +42,9 @@ use bevy::{
 };
 
 use bevy_instancing::prelude::{
-    CustomMaterial, CustomMaterialPlugin, GpuCustomMeshInstance, IndirectRenderingPlugin,
+    CustomMaterial, CustomMaterialPlugin, GpuColorMeshInstance, IndirectRenderingPlugin,
     InstanceBlock, InstanceBlockBuffer, InstanceBlockBundle, InstanceBlockRange,
-    SpecializedInstancedMaterial,
+    SpecializedInstancedMaterial, 
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -255,10 +256,10 @@ pub fn queue_compute_instances<M: SpecializedInstancedMaterial>(
                     binding: 1,
                     resource: BindingResource::Buffer(BufferBinding {
                         buffer: &instance_block_buffer.buffer,
-                        offset: std::mem::size_of::<GpuCustomMeshInstance>() as u64
+                        offset: std::mem::size_of::<GpuColorMeshInstance>() as u64
                             * instance_block_range.offset,
                         size: NonZeroU64::new(
-                            std::mem::size_of::<GpuCustomMeshInstance>() as u64
+                            std::mem::size_of::<GpuColorMeshInstance>() as u64
                                 * instance_block_range.instance_count,
                         ),
                     }),
@@ -288,6 +289,8 @@ pub struct InstanceComputeUniform {
     _pad1: f32,
     tangent: Vec3,
     _pad2: f32,
+    tint: Vec3,
+    _pad3: f32,
 }
 
 impl ExtractComponent for InstanceComputeUniform {
@@ -357,6 +360,7 @@ fn setup_instancing(
             ..default()
         })
         .insert(InstanceComputeUniform {
+            tint: Vec3::new(1.0, 1.0, 1.0),
             normal: Vec3::X,
             tangent: -Vec3::Y,
             ..default()
@@ -374,11 +378,12 @@ fn setup_instancing(
             ..default()
         })
         .insert(InstanceComputeUniform {
+            tint: Vec3::new(1.0, 0.0, 0.0),
             normal: -Vec3::X,
             tangent: Vec3::Y,
             ..default()
         });
-        
+
     commands
         .spawn()
         .insert(Name::new("Back Face Sphere Instance Block"))
@@ -391,6 +396,7 @@ fn setup_instancing(
             ..default()
         })
         .insert(InstanceComputeUniform {
+            tint: Vec3::new(0.0, 1.0, 0.0),
             normal: -Vec3::Z,
             tangent: -Vec3::Y,
             ..default()
@@ -408,6 +414,7 @@ fn setup_instancing(
             ..default()
         })
         .insert(InstanceComputeUniform {
+            tint: Vec3::new(0.0, 0.0, 1.0),
             normal: Vec3::Z,
             tangent: Vec3::Y,
             ..default()

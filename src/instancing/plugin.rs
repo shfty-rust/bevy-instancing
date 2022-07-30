@@ -1,13 +1,11 @@
 use bevy::{
     asset::load_internal_asset,
-    prelude::{AddAsset, App, Assets, Handle, HandleUntyped, Plugin, Shader},
+    prelude::{App, HandleUntyped, Plugin, Shader},
     reflect::TypeUuid,
     render::{render_component::ExtractComponentPlugin, RenderApp},
 };
 
-use crate::prelude::{
-    BasicMaterial, InstanceBlock, InstancedMaterialPlugin, InstancedMeshPipeline, MeshInstanceColor,
-};
+use crate::prelude::{InstanceBlock, InstancedMeshPipeline};
 
 use bevy::asset as bevy_asset;
 
@@ -47,20 +45,11 @@ impl Plugin for IndirectRenderingPlugin {
             Shader::from_wgsl
         );
 
-        app.register_type::<MeshInstanceColor>()
-            .register_type::<InstanceBlock>();
+        app.register_type::<InstanceBlock>();
 
         app.add_plugin(ExtractComponentPlugin::<InstanceBlock>::default());
 
         app.sub_app_mut(RenderApp)
             .init_resource::<InstancedMeshPipeline>();
-
-        // Material
-        app.add_asset::<BasicMaterial>()
-            .add_plugin(InstancedMaterialPlugin::<BasicMaterial>::default());
-
-        app.world
-            .resource_mut::<Assets<BasicMaterial>>()
-            .set_untracked(Handle::<BasicMaterial>::default(), BasicMaterial::default());
     }
 }

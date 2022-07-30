@@ -1,4 +1,3 @@
-pub mod basic_material;
 pub mod instanced_material;
 pub mod instanced_material_pipeline;
 pub mod plugin;

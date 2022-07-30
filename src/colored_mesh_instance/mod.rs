@@ -1,17 +1,18 @@
+pub mod color_instance_bundle;
+pub mod mesh_instance_color;
+pub mod plugin;
+
 use bevy::{
     ecs::system::lifetimeless::Read,
     math::{Mat4, Vec4},
-    prelude::{default, Commands, Component, Entity, Query},
+    prelude::{default, Component},
 };
 use bytemuck::{Pod, Zeroable};
 
-use crate::prelude::{
-    GpuMeshInstance, Instance, MeshInstance, MeshInstanceColor, ReadOnlyQueryItem,
-    SpecializedInstancedMaterial,
-};
+use crate::prelude::{GpuMeshInstance, Instance, InstanceColor, MeshInstance, ReadOnlyQueryItem};
 
 #[derive(Debug, Default, Clone, PartialEq, Component)]
-pub struct CustomMeshInstance {
+pub struct ColorMeshInstance {
     pub base: MeshInstance,
     pub color: Vec4,
 }
@@ -19,12 +20,12 @@ pub struct CustomMeshInstance {
 /// GPU-friendly data for a since mesh instance
 #[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable, Component)]
 #[repr(C)]
-pub struct GpuCustomMeshInstance {
+pub struct GpuColorMeshInstance {
     pub base: GpuMeshInstance,
     pub color: Vec4,
 }
 
-impl Default for GpuCustomMeshInstance {
+impl Default for GpuColorMeshInstance {
     fn default() -> Self {
         Self {
             base: default(),
@@ -33,23 +34,23 @@ impl Default for GpuCustomMeshInstance {
     }
 }
 
-impl Instance for CustomMeshInstance {
+impl Instance for ColorMeshInstance {
     type ExtractedInstance = Self;
-    type PreparedInstance = GpuCustomMeshInstance;
+    type PreparedInstance = GpuColorMeshInstance;
 
-    type Query = (<MeshInstance as Instance>::Query, Read<MeshInstanceColor>);
+    type Query = (<MeshInstance as Instance>::Query, Read<InstanceColor>);
 
     fn extract_instance<'w>(
         (base, color): ReadOnlyQueryItem<Self::Query>,
     ) -> Self::ExtractedInstance {
-        CustomMeshInstance {
+        ColorMeshInstance {
             base: MeshInstance::extract_instance(base),
             color: Vec4::new(color.r(), color.g(), color.b(), color.a()),
         }
     }
 
     fn prepare_instance(instance: &Self::ExtractedInstance, mesh: u32) -> Self::PreparedInstance {
-        GpuCustomMeshInstance {
+        GpuColorMeshInstance {
             base: MeshInstance::prepare_instance(&instance.base, mesh),
             color: instance.color,
         }
@@ -57,15 +58,5 @@ impl Instance for CustomMeshInstance {
 
     fn transform(instance: &Self::ExtractedInstance) -> Mat4 {
         instance.base.transform
-    }
-}
-
-pub fn extract_mesh_instances<M: SpecializedInstancedMaterial>(
-    query_mesh_instance: Query<(Entity, <M::Instance as Instance>::Query)>,
-    mut commands: Commands,
-) {
-    for (entity, item) in query_mesh_instance.iter() {
-        commands
-            .insert_or_spawn_batch([(entity, (<M::Instance as Instance>::extract_instance(item),))])
     }
 }
