@@ -1,3 +1,10 @@
+//! Demonstration of InstanceBlock compute functionality
+//!
+//! Also highlights alpha ordering behaviour for transparent instance blocks;
+//! batch order is visible when instances from different blocks draw on top
+//! of one another.
+//!
+
 use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
