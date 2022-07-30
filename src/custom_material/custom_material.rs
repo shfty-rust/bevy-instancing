@@ -15,17 +15,17 @@ use bevy::{
 };
 
 use crate::prelude::{
-    InstancedMaterialPipeline, SpecializedInstancedMaterial, BOARD_SHADER_HANDLE, BoardMeshInstance,
+    InstancedMaterialPipeline, SpecializedInstancedMaterial, CUSTOM_SHADER_HANDLE, CustomMeshInstance,
 };
 
 #[derive(Debug, Clone, TypeUuid)]
 #[uuid = "6dc3b9fc-fcfd-4149-8f20-5d3a1573e5da"]
-pub struct BoardMaterial {
+pub struct CustomMaterial {
     pub alpha_mode: AlphaMode,
     pub cull_mode: Option<Face>,
 }
 
-impl Default for BoardMaterial {
+impl Default for CustomMaterial {
     fn default() -> Self {
         Self {
             alpha_mode: default(),
@@ -35,15 +35,15 @@ impl Default for BoardMaterial {
 }
 
 #[derive(Clone)]
-pub struct GpuBoardMaterial {
+pub struct GpuCustomMaterial {
     pub bind_group: BindGroup,
     pub alpha_mode: AlphaMode,
     pub cull_mode: Option<Face>,
 }
 
-impl RenderAsset for BoardMaterial {
-    type ExtractedAsset = BoardMaterial;
-    type PreparedAsset = GpuBoardMaterial;
+impl RenderAsset for CustomMaterial {
+    type ExtractedAsset = CustomMaterial;
+    type PreparedAsset = GpuCustomMaterial;
     type Param = (SRes<RenderDevice>, SRes<InstancedMaterialPipeline<Self>>);
     fn extract_asset(&self) -> Self::ExtractedAsset {
         self.clone()
@@ -59,7 +59,7 @@ impl RenderAsset for BoardMaterial {
             layout: &material_pipeline.material_layout,
         });
 
-        Ok(GpuBoardMaterial {
+        Ok(GpuCustomMaterial {
             bind_group,
             alpha_mode: extracted_asset.alpha_mode,
             cull_mode: extracted_asset.cull_mode,
@@ -68,11 +68,11 @@ impl RenderAsset for BoardMaterial {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct BoardMaterialKey {
+pub struct CustomMaterialKey {
     pub cull_mode: Option<Face>,
 }
 
-impl PartialOrd for BoardMaterialKey {
+impl PartialOrd for CustomMaterialKey {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.cull_mode
             .map(|cull_mode| cull_mode as usize)
@@ -80,7 +80,7 @@ impl PartialOrd for BoardMaterialKey {
     }
 }
 
-impl Ord for BoardMaterialKey {
+impl Ord for CustomMaterialKey {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.cull_mode
             .map(|cull_mode| cull_mode as usize)
@@ -88,22 +88,22 @@ impl Ord for BoardMaterialKey {
     }
 }
 
-impl SpecializedInstancedMaterial for BoardMaterial {
-    type Key = BoardMaterialKey;
-    type Instance = BoardMeshInstance;
+impl SpecializedInstancedMaterial for CustomMaterial {
+    type Key = CustomMaterialKey;
+    type Instance = CustomMeshInstance;
 
-    fn key(render_asset: &<BoardMaterial as RenderAsset>::PreparedAsset) -> Self::Key {
-        BoardMaterialKey {
+    fn key(render_asset: &<CustomMaterial as RenderAsset>::PreparedAsset) -> Self::Key {
+        CustomMaterialKey {
             cull_mode: render_asset.cull_mode,
         }
     }
 
     fn vertex_shader(_: &AssetServer) -> Option<Handle<Shader>> {
-        Some(BOARD_SHADER_HANDLE.typed::<Shader>())
+        Some(CUSTOM_SHADER_HANDLE.typed::<Shader>())
     }
 
     fn fragment_shader(_: &AssetServer) -> Option<Handle<Shader>> {
-        Some(BOARD_SHADER_HANDLE.typed::<Shader>())
+        Some(CUSTOM_SHADER_HANDLE.typed::<Shader>())
     }
 
     fn specialize(

@@ -1,7 +1,7 @@
 use bevy::{
     ecs::system::lifetimeless::Read,
     math::{Mat4, Vec4},
-    prelude::{default, Commands, Component, Entity, Handle, Mesh, Query},
+    prelude::{default, Commands, Component, Entity, Query},
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -11,7 +11,7 @@ use crate::prelude::{
 };
 
 #[derive(Debug, Default, Clone, PartialEq, Component)]
-pub struct BoardMeshInstance {
+pub struct CustomMeshInstance {
     pub base: MeshInstance,
     pub color: Vec4,
 }
@@ -19,12 +19,12 @@ pub struct BoardMeshInstance {
 /// GPU-friendly data for a since mesh instance
 #[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable, Component)]
 #[repr(C)]
-pub struct GpuBoardMeshInstance {
+pub struct GpuCustomMeshInstance {
     pub base: GpuMeshInstance,
     pub color: Vec4,
 }
 
-impl Default for GpuBoardMeshInstance {
+impl Default for GpuCustomMeshInstance {
     fn default() -> Self {
         Self {
             base: default(),
@@ -33,30 +33,26 @@ impl Default for GpuBoardMeshInstance {
     }
 }
 
-impl Instance for BoardMeshInstance {
+impl Instance for CustomMeshInstance {
     type ExtractedInstance = Self;
-    type PreparedInstance = GpuBoardMeshInstance;
+    type PreparedInstance = GpuCustomMeshInstance;
 
     type Query = (<MeshInstance as Instance>::Query, Read<MeshInstanceColor>);
 
     fn extract_instance<'w>(
         (base, color): ReadOnlyQueryItem<Self::Query>,
     ) -> Self::ExtractedInstance {
-        BoardMeshInstance {
+        CustomMeshInstance {
             base: MeshInstance::extract_instance(base),
             color: Vec4::new(color.r(), color.g(), color.b(), color.a()),
         }
     }
 
     fn prepare_instance(instance: &Self::ExtractedInstance, mesh: u32) -> Self::PreparedInstance {
-        GpuBoardMeshInstance {
+        GpuCustomMeshInstance {
             base: MeshInstance::prepare_instance(&instance.base, mesh),
             color: instance.color,
         }
-    }
-
-    fn mesh(instance: &Self::ExtractedInstance) -> &Handle<Mesh> {
-        &instance.base.mesh
     }
 
     fn transform(instance: &Self::ExtractedInstance) -> Mat4 {

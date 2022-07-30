@@ -1,7 +1,7 @@
 use bevy::{
     ecs::query::{Fetch, WorldQuery},
     math::Mat4,
-    prelude::{Component, Handle, Mesh},
+    prelude::Component,
 };
 use bytemuck::Pod;
 
@@ -15,7 +15,5 @@ pub trait Instance {
     fn extract_instance(instance: ReadOnlyQueryItem<Self::Query>) -> Self::ExtractedInstance;
     fn prepare_instance(instance: &Self::ExtractedInstance, mesh: u32) -> Self::PreparedInstance;
 
-    fn mesh(instance: &Self::ExtractedInstance) -> &Handle<Mesh>;
     fn transform(instance: &Self::ExtractedInstance) -> Mat4;
 }
-

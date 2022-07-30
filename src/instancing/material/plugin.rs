@@ -61,13 +61,11 @@ impl<M: SpecializedInstancedMaterial> Default for InstancedMaterialPlugin<M> {
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Plugin for InstancedMaterialPlugin<M>
-where
-    M::Key: PartialOrd + Ord + std::fmt::Debug,
-{
+impl<M: SpecializedInstancedMaterial> Plugin for InstancedMaterialPlugin<M> {
     fn build(&self, app: &mut App) {
         app.add_asset::<M>()
             .add_plugin(ExtractComponentPlugin::<Handle<M>>::default())
+            .add_plugin(ExtractComponentPlugin::<Handle<Mesh>>::default())
             .add_plugin(RenderAssetPlugin::<M>::default());
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
@@ -189,12 +187,13 @@ impl<M: SpecializedInstancedMaterial> Default for GpuInstancedMeshes<M> {
 
 fn extract_instanced_meshes<M: SpecializedInstancedMaterial>(
     meshes: Res<Assets<Mesh>>,
-    query_mesh: Query<&Handle<Mesh>, With<Handle<M>>>,
+    query_instance: Query<&Handle<Mesh>, With<Handle<M>>>,
     mut commands: Commands,
 ) {
     let mut instanced_meshes = HashMap::new();
 
-    for mesh_handle in query_mesh.iter().collect::<HashSet<_>>() {
+    for mesh_handle in query_instance.iter().collect::<HashSet<_>>() {
+        info!("Mesh {mesh_handle:?}");
         let mesh = meshes.get(mesh_handle).unwrap();
         let vertex_buffer_data = mesh.get_vertex_buffer_data();
         let vertex_count = mesh.count_vertices();
@@ -448,7 +447,7 @@ pub struct InstanceMeta<M: SpecializedInstancedMaterial> {
     pub mesh_batches: HashMap<Hashed<InstancedMeshKey>, MeshBatch>,
     pub material_batches: HashMap<InstancedMaterialKey<M>, Handle<M>>,
     pub instance_batches: HashMap<InstanceBatchKey<M>, InstanceBatch<M>>,
-    pub batched_instances: HashMap<InstanceBatchKey<M>, BatchedInstances>,
+    pub batched_instances: BTreeMap<InstanceBatchKey<M>, BatchedInstances>,
 }
 
 impl<M: SpecializedInstancedMaterial> Default for InstanceMeta<M> {
@@ -516,19 +515,25 @@ pub fn prepare_view_instance_blocks<M: SpecializedInstancedMaterial>(
     query_instance_block: Query<Entity, (With<Handle<M>>, With<InstanceBlock>)>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
 ) {
-    info!("prepare_view_instance_blocks<{}>", std::any::type_name::<M>());
+    info!(
+        "prepare_view_instance_blocks<{}>",
+        std::any::type_name::<M>()
+    );
 
     for (view_entity, visible_entities) in query_views.iter() {
-        info!("View {view_entity:?}");
-        instance_view_meta
-            .get_mut(&view_entity)
-            .unwrap()
-            .instance_blocks = visible_entities
+        let instance_blocks = visible_entities
             .entities
             .iter()
             .copied()
             .filter(|entity| query_instance_block.get(*entity).is_ok())
             .collect::<Vec<_>>();
+
+        info!("View {view_entity:?} instance blocks: {instance_blocks:#?}");
+
+        instance_view_meta
+            .get_mut(&view_entity)
+            .unwrap()
+            .instance_blocks = instance_blocks;
     }
 }
 
@@ -539,12 +544,11 @@ pub fn prepare_mesh_batches<M: SpecializedInstancedMaterial>(
     query_instance: Query<(
         Entity,
         &Handle<M>,
+        &Handle<Mesh>,
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
-    query_instance_block: Query<(Entity, &Handle<M>, &InstanceBlock)>,
-) where
-    M::Key: PartialOrd + Ord + std::fmt::Debug,
-{
+    query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
+) {
     info!("prepare_mesh_batches<{}>", std::any::type_name::<M>());
 
     let render_meshes = &render_meshes.instanced_meshes;
@@ -558,13 +562,19 @@ pub fn prepare_mesh_batches<M: SpecializedInstancedMaterial>(
             .instances
             .iter()
             .flat_map(|entity| query_instance.get(*entity))
-            .map(|(_, _, instance)| <M::Instance as Instance>::mesh(instance).clone_weak())
+            .map(|(_, _, mesh, _)| mesh.clone_weak())
             .chain(
                 instance_meta
                     .instance_blocks
                     .iter()
-                    .flat_map(|entity| query_instance_block.get(*entity))
-                    .map(|(_, _, instance_block)| instance_block.mesh.clone_weak()),
+                    .flat_map(|entity| {
+                        info!("Instance block {entity:?}");
+                        query_instance_block.get(*entity)
+                    })
+                    .map(|(_, _, mesh, _)| {
+                        info!("Mesh: {mesh:?}");
+                        mesh.clone_weak()
+                    }),
             )
             .collect::<HashSet<_>>();
 
@@ -696,12 +706,11 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
     query_instance: Query<(
         Entity,
         &Handle<M>,
+        &Handle<Mesh>,
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
-    query_instance_block: Query<(Entity, &Handle<M>, &InstanceBlock)>,
-) where
-    M::Key: PartialOrd + Ord + std::fmt::Debug,
-{
+    query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
+) {
     info!("prepare_instance_batches<{}>", std::any::type_name::<M>());
 
     let render_meshes = &render_meshes.instanced_meshes;
@@ -721,21 +730,19 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
                 InstanceBatchKey<M>,
                 Vec<(
                     Entity,
-                    Handle<Mesh>,
                     &Handle<M>,
+                    &Handle<Mesh>,
                     FloatOrd,
                     &<M::Instance as Instance>::ExtractedInstance,
                 )>,
             >::new();
 
-            for (entity, material_handle, instance) in instance_meta
+            for (entity, material_handle, mesh_handle, instance) in instance_meta
                 .instances
                 .iter()
                 .flat_map(|entity| query_instance.get(*entity))
             {
-                let mesh = render_meshes
-                    .get(<M::Instance as Instance>::mesh(instance))
-                    .unwrap();
+                let mesh = render_meshes.get(mesh_handle).unwrap();
                 let mesh_key = mesh.key.clone();
 
                 let material = render_materials.get(material_handle).unwrap();
@@ -764,8 +771,8 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
 
                 keyed_instances.entry(key).or_default().push((
                     entity,
-                    <M::Instance as Instance>::mesh(instance).clone_weak(),
                     material_handle,
+                    mesh_handle,
                     FloatOrd(dist),
                     instance,
                 ));
@@ -793,12 +800,13 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
             let mut keyed_instance_blocks =
                 BTreeMap::<InstanceBatchKey<M>, Vec<(Entity, &Handle<M>, &InstanceBlock)>>::new();
 
-            for (entity, material_handle, instance_block) in instance_meta
+            for (entity, material_handle, mesh_handle, instance_block) in instance_meta
                 .instance_blocks
                 .iter()
                 .flat_map(|entity| query_instance_block.get(*entity))
             {
-                let mesh = render_meshes.get(&instance_block.mesh).unwrap();
+                info!("Instance block {entity:?}");
+                let mesh = render_meshes.get(mesh_handle).unwrap();
                 let mesh_key = mesh.key.clone();
 
                 let material = render_materials.get(material_handle).unwrap();
@@ -823,6 +831,11 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
             keyed_instance_blocks
         });
 
+        info!(
+            "Keyed instance blocks: {:#?}",
+            keyed_instance_blocks.values()
+        );
+
         // Create an instance buffer vec for each key
         let mut keyed_instance_buffer_data =
             BTreeMap::<InstanceBatchKey<M>, Vec<<M::Instance as Instance>::PreparedInstance>>::new(
@@ -833,18 +846,16 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
             // Populate instances
             for (key, instances) in keyed_instances.iter() {
                 // Collect instance data
-                let instance_buffer_data = instances.iter().map(|(_, _, _, _, instance)| {
-                    let MeshBatch { meshes, .. } =
-                        instance_meta.mesh_batches.get(&key.mesh_key).unwrap();
+                let instance_buffer_data =
+                    instances.iter().map(|(_, _, mesh_handle, _, instance)| {
+                        let MeshBatch { meshes, .. } =
+                            instance_meta.mesh_batches.get(&key.mesh_key).unwrap();
 
-                    <M::Instance as Instance>::prepare_instance(
-                        instance,
-                        meshes
-                            .iter()
-                            .position(|mesh| mesh == <M::Instance as Instance>::mesh(instance))
-                            .unwrap() as u32,
-                    )
-                });
+                        <M::Instance as Instance>::prepare_instance(
+                            instance,
+                            meshes.iter().position(|mesh| mesh == *mesh_handle).unwrap() as u32,
+                        )
+                    });
 
                 keyed_instance_buffer_data
                     .entry(key.clone())
@@ -868,6 +879,7 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
                     let mut offset = instance_buffer_data_len;
                     let mut instance_block_ranges = BTreeMap::<Entity, InstanceBlockRange>::new();
                     for (entity, _, instance_block) in instance_blocks {
+                        info!("Generating InstanceBlockRange for {entity:?}");
                         // Generate instance block range
                         instance_block_ranges.insert(
                             *entity,
@@ -998,14 +1010,13 @@ pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
     query_instance: Query<(
         Entity,
         &Handle<M>,
+        &Handle<Mesh>,
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
-    query_instance_block: Query<(Entity, &Handle<M>, &InstanceBlock)>,
+    query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
     mut query_views: Query<Entity, With<ExtractedView>>,
     mut commands: Commands,
-) where
-    M::Key: PartialOrd + Ord + std::fmt::Debug,
-{
+) {
     info!(
         "prepare_instanced_materials<{}>",
         std::any::type_name::<M>()
@@ -1022,13 +1033,13 @@ pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
             .instances
             .iter()
             .flat_map(|entity| query_instance.get(*entity))
-            .map(|(_, material, _)| material.clone_weak())
+            .map(|(_, material, _, _)| material.clone_weak())
             .chain(
                 instance_meta
                     .instance_blocks
                     .iter()
                     .flat_map(|entity| query_instance_block.get(*entity))
-                    .map(|(_, material, _)| material.clone_weak()),
+                    .map(|(_, material, _, _)| material.clone_weak()),
             )
             .collect::<BTreeSet<_>>();
 
@@ -1048,7 +1059,7 @@ pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
             .collect();
 
         // Process batches
-        let mut batched_instances = HashMap::<InstanceBatchKey<M>, BatchedInstances>::new();
+        let mut batched_instances = BTreeMap::<InstanceBatchKey<M>, BatchedInstances>::new();
         for (key, instance_batch) in &instance_meta.instance_batches {
             // Fetch data
             let MeshBatch {
@@ -1069,20 +1080,19 @@ pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
                 .instances
                 .iter()
                 .flat_map(|entity| query_instance.get(*entity))
-                .map(|(_, _, instance)| <M::Instance as Instance>::mesh(instance));
+                .map(|(_, _, mesh, _)| mesh);
 
             for mesh in instance_meshes {
                 *mesh_instance_counts.get_mut(mesh).unwrap() += 1;
             }
 
-            for instance_block in instance_batch
+            for (mesh, instance_block) in instance_batch
                 .instance_block_ranges
                 .iter()
                 .flat_map(|(entity, _)| query_instance_block.get(*entity))
-                .map(|(_, _, instance_block)| instance_block)
+                .map(|(_, _, mesh, instance_block)| (mesh, instance_block))
             {
-                *mesh_instance_counts.get_mut(&instance_block.mesh).unwrap() +=
-                    instance_block.instance_count;
+                *mesh_instance_counts.get_mut(mesh).unwrap() += instance_block.instance_count;
             }
 
             debug!("Mesh instance counts: {mesh_instance_counts:?}");
@@ -1298,9 +1308,7 @@ pub fn queue_instanced_materials<M: SpecializedInstancedMaterial>(
     mut query_opaque_3d: Query<&mut RenderPhase<Opaque3d>>,
     mut query_alpha_mask_3d: Query<&mut RenderPhase<AlphaMask3d>>,
     mut query_transparent_3d: Query<&mut RenderPhase<Transparent3d>>,
-) where
-    M::Key: PartialOrd + Ord + std::fmt::Debug,
-{
+) {
     info!("queue_instanced_materials<{}>", std::any::type_name::<M>());
 
     for (view_entity, instance_meta) in instance_view_meta.iter() {

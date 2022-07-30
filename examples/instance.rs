@@ -22,7 +22,7 @@ use bevy::{
 };
 
 use bevy_instancing::prelude::{
-    BasicMaterial, BoardInstanceBundle, BoardMaterial, IndirectRenderingPlugin, InstanceBundle, CustomMaterialPlugin,
+    BasicMaterial, CustomInstanceBundle, CustomMaterial, IndirectRenderingPlugin, InstanceBundle, CustomMaterialPlugin,
 };
 
 // Test indirect rendering
@@ -106,7 +106,7 @@ struct SecondWindowCamera3d;
 fn setup_instancing(
     mut create_window_events: EventWriter<CreateWindow>,
     mut meshes: ResMut<Assets<Mesh>>,
-    mut board_materials: ResMut<Assets<BoardMaterial>>,
+    mut board_materials: ResMut<Assets<CustomMaterial>>,
     mut commands: Commands,
 ) {
     let window_id = WindowId::new();
@@ -168,47 +168,47 @@ fn setup_instancing(
 
     let material_basic = Handle::<BasicMaterial>::default();
 
-    let material_opaque_no_cull = board_materials.add(BoardMaterial {
+    let material_opaque_no_cull = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Opaque,
         cull_mode: None,
     });
 
-    let material_mask_no_cull = board_materials.add(BoardMaterial {
+    let material_mask_no_cull = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Mask(0.5),
         cull_mode: None,
     });
 
-    let material_blend_no_cull = board_materials.add(BoardMaterial {
+    let material_blend_no_cull = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Blend,
         cull_mode: None,
     });
 
-    let material_opaque_cull_front = board_materials.add(BoardMaterial {
+    let material_opaque_cull_front = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Opaque,
         cull_mode: Some(Face::Front),
     });
 
-    let material_mask_cull_front = board_materials.add(BoardMaterial {
+    let material_mask_cull_front = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Mask(0.5),
         cull_mode: Some(Face::Front),
     });
 
-    let material_blend_cull_front = board_materials.add(BoardMaterial {
+    let material_blend_cull_front = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Blend,
         cull_mode: Some(Face::Front),
     });
 
-    let material_opaque_cull_back = board_materials.add(BoardMaterial {
+    let material_opaque_cull_back = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Opaque,
         cull_mode: Some(Face::Back),
     });
 
-    let material_mask_cull_back = board_materials.add(BoardMaterial {
+    let material_mask_cull_back = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Mask(0.5),
         cull_mode: Some(Face::Back),
     });
 
-    let material_blend_cull_back = board_materials.add(BoardMaterial {
+    let material_blend_cull_back = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Blend,
         cull_mode: Some(Face::Back),
     });
@@ -255,7 +255,7 @@ fn setup_instancing(
                 commands
                     .spawn()
                     .insert(Name::new(format!("Cube Instance ({x:}, {y:}, {z:})")))
-                    .insert_bundle(BoardInstanceBundle {
+                    .insert_bundle(CustomInstanceBundle {
                         instance_bundle: InstanceBundle {
                             mesh: mesh.clone(),
                             material: material.clone(),

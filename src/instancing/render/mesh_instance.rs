@@ -50,10 +50,6 @@ impl Instance for MeshInstance {
         }
     }
 
-    fn mesh(instance: &Self::ExtractedInstance) -> &Handle<Mesh> {
-        &instance.mesh
-    }
-
     fn transform(instance: &Self::ExtractedInstance) -> Mat4 {
         instance.transform
     }

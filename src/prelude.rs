@@ -1,6 +1,6 @@
 pub use crate::{
     custom_material::{
-        board_instance_bundle::*, board_material::*, board_mesh_instance::*,
+        custom_instance_bundle::*, custom_material::*, custom_mesh_instance::*,
         mesh_instance_color::*, *,
     },
     instancing::{
