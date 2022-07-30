@@ -1,5 +1,3 @@
-TODO: Investigate replacing Instance trait with ExtractComponent
-
 TODO: Uniform support for instance buffer
       * Need to split instances into
         (std::mem::size_of::<InstanceData>() / MAX_UNIFORM_BUFFER_SIZE) sub-batches,
