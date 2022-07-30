@@ -2,18 +2,18 @@
 #import bevy_pbr::mesh_struct
 #import indirect_instancing::instance_struct
 
-struct BoardInstanceData {
+struct CustomInstanceData {
     base: InstanceData;
     color: vec4<f32>;
 };
 
-struct BoardInstances {
-    instances: array<BoardInstanceData>;
+struct CustomInstances {
+    instances: array<CustomInstanceData>;
 };
 
 
 [[group(2), binding(0)]]
-var<storage> instances: BoardInstances;
+var<storage> instances: CustomInstances;
 
 struct VertexInput {
     [[builtin(instance_index)]] instance: u32;
