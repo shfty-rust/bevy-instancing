@@ -1,6 +1,3 @@
-TODO: Standalone example for InstanceBlock
-      * Run compute animations over a few different mesh / material block permutations
-
 TODO: Investigate spliting SpecializedInstancedMaterial::Key into InstanceKey and PipelineKey
       * Currently coupling pipelines to mutually compatible sets of materials
         * i.e. Materials that share both a bind group and parameter values
@@ -29,4 +26,21 @@ TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances
         * Should be able to encode most StandardMaterial params as instance data
       * Secondary goal: Make shadows work
+
+NOTES: Transparency ordering
+      * Currently, transparency ordering is only correct versus other instances with the
+        same mesh within the same batch
+        * This is down to sorting each batch into contiguous blocks of a given mesh,
+          then sorting the instances in those blocks by depth
+      * It's fundamentally more performant due to scaling by O(mesh_count) calls,
+        but also fundamentally incorrect w.r.t. transparency ordering
+      * Correctness requires that depth supercedes mesh for sorting purposes
+        * Batches could be sorted by depth, and then a series of indirect draw calls
+          could be generated for each contiguous block of a given mesh
+      * However, is this worth it given that transparency ordering cannot take place across different batches? 
+        * With this context, order-independence is the only truly correct solution
+        * Intuition says favour performance for now and document technicalities around instanced draw order
+          * Mesh / Material key types can control ordering at the type level for user control
+          * Only affects transparent objects
+          * Extra complexity not worth it for correctness within the same material, but incorrectness vs others
 

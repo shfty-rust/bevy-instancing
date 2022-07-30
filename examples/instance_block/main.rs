@@ -19,7 +19,7 @@ use bevy::render::render_component::{ExtractComponent, ExtractComponentPlugin};
 use bevy::render::render_graph::{Node, NodeLabel, RenderGraph};
 use bevy::render::render_resource::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingResource, BindingType, Buffer, BufferBinding, BufferBindingType,
+    BindGroupLayoutEntry, BindingResource, BindingType, BufferBinding, BufferBindingType,
     BufferInitDescriptor, BufferUsages, CachedComputePipelineId, ComputePassDescriptor,
     ComputePipelineDescriptor, PipelineCache, ShaderStages, Face,
 };
