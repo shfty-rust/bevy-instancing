@@ -1,5 +1,3 @@
-TODO: Remove transform function from Instance trait, use component query instead
-
 TODO: Investigate replacing Instance trait with ExtractComponent
 
 TODO: Uniform support for instance buffer

@@ -13,7 +13,7 @@ use bevy::{
     pbr::{AlphaMode, MeshPipelineKey, SetMeshViewBindGroup},
     prelude::{
         debug, default, error, Assets, Commands, Deref, DerefMut, Entity, Handle, Mesh,
-        ParallelSystemDescriptorCoercion, With,
+        ParallelSystemDescriptorCoercion, With, GlobalTransform, Transform,
     },
     render::{
         mesh::{Indices, MeshVertexBufferLayout, PrimitiveTopology},
