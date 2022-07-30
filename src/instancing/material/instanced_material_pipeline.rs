@@ -31,7 +31,7 @@ pub struct InstancedMaterialPipeline<M: SpecializedInstancedMaterial> {
 }
 
 impl<M: SpecializedInstancedMaterial> SpecializedMeshPipeline for InstancedMaterialPipeline<M> {
-    type Key = InstancedMaterialPipelineKey<M::Key>;
+    type Key = InstancedMaterialPipelineKey<M::PipelineKey>;
 
     fn specialize(
         &self,

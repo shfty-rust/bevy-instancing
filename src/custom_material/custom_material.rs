@@ -89,10 +89,17 @@ impl Ord for CustomMaterialKey {
 }
 
 impl SpecializedInstancedMaterial for CustomMaterial {
-    type Key = CustomMaterialKey;
+    type PipelineKey = CustomMaterialKey;
+    type BatchKey = CustomMaterialKey;
     type Instance = CustomMeshInstance;
 
-    fn key(render_asset: &<CustomMaterial as RenderAsset>::PreparedAsset) -> Self::Key {
+    fn pipeline_key(render_asset: &<CustomMaterial as RenderAsset>::PreparedAsset) -> Self::BatchKey {
+        CustomMaterialKey {
+            cull_mode: render_asset.cull_mode,
+        }
+    }
+
+    fn batch_key(render_asset: &<CustomMaterial as RenderAsset>::PreparedAsset) -> Self::BatchKey {
         CustomMaterialKey {
             cull_mode: render_asset.cull_mode,
         }
@@ -109,7 +116,7 @@ impl SpecializedInstancedMaterial for CustomMaterial {
     fn specialize(
         _pipeline: &InstancedMaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
-        key: Self::Key,
+        key: Self::BatchKey,
         _layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError> {
         descriptor.primitive.cull_mode = key.cull_mode;

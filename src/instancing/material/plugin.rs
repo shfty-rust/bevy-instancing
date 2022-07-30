@@ -108,7 +108,7 @@ impl<M: SpecializedInstancedMaterial> Plugin for InstancedMaterialPlugin<M> {
                 )
                 .add_system_to_stage(
                     RenderStage::Prepare,
-                    prepare_instanced_materials::<M>.after(prepare_instance_batches::<M>),
+                    prepare_batched_instances::<M>.after(prepare_instance_batches::<M>),
                 )
                 .add_system_to_stage(RenderStage::Queue, queue_instanced_materials::<M>);
         }
@@ -270,12 +270,12 @@ impl From<AlphaMode> for GpuAlphaMode {
 }
 
 /// Unique key describing a set of mutually incompatible materials
-pub struct InstancedMaterialKey<M: SpecializedInstancedMaterial> {
+pub struct InstancedMaterialBatchKey<M: SpecializedInstancedMaterial> {
     alpha_mode: GpuAlphaMode,
-    key: M::Key,
+    key: M::BatchKey,
 }
 
-impl<M: SpecializedInstancedMaterial> Clone for InstancedMaterialKey<M> {
+impl<M: SpecializedInstancedMaterial> Clone for InstancedMaterialBatchKey<M> {
     fn clone(&self) -> Self {
         Self {
             alpha_mode: self.alpha_mode.clone(),
@@ -284,17 +284,17 @@ impl<M: SpecializedInstancedMaterial> Clone for InstancedMaterialKey<M> {
     }
 }
 
-impl<M: SpecializedInstancedMaterial> PartialEq for InstancedMaterialKey<M> {
+impl<M: SpecializedInstancedMaterial> PartialEq for InstancedMaterialBatchKey<M> {
     fn eq(&self, other: &Self) -> bool {
         self.alpha_mode == other.alpha_mode && self.key == other.key
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Eq for InstancedMaterialKey<M> {}
+impl<M: SpecializedInstancedMaterial> Eq for InstancedMaterialBatchKey<M> {}
 
-impl<M: SpecializedInstancedMaterial> PartialOrd for InstancedMaterialKey<M>
+impl<M: SpecializedInstancedMaterial> PartialOrd for InstancedMaterialBatchKey<M>
 where
-    M::Key: PartialOrd,
+    M::BatchKey: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match self.alpha_mode.partial_cmp(&other.alpha_mode) {
@@ -305,9 +305,9 @@ where
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Ord for InstancedMaterialKey<M>
+impl<M: SpecializedInstancedMaterial> Ord for InstancedMaterialBatchKey<M>
 where
-    M::Key: Ord,
+    M::BatchKey: Ord,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.alpha_mode.cmp(&other.alpha_mode) {
@@ -318,16 +318,16 @@ where
     }
 }
 
-impl<M: SpecializedInstancedMaterial> std::hash::Hash for InstancedMaterialKey<M> {
+impl<M: SpecializedInstancedMaterial> std::hash::Hash for InstancedMaterialBatchKey<M> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.alpha_mode.hash(state);
         self.key.hash(state);
     }
 }
 
-impl<M: SpecializedInstancedMaterial> std::fmt::Debug for InstancedMaterialKey<M>
+impl<M: SpecializedInstancedMaterial> std::fmt::Debug for InstancedMaterialBatchKey<M>
 where
-    M::Key: std::fmt::Debug,
+    M::BatchKey: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InstancedMaterialKey")
@@ -340,7 +340,7 @@ where
 /// Unique key describing a set of mutually incompatible instances
 pub struct InstanceBatchKey<M: SpecializedInstancedMaterial> {
     mesh_key: Hashed<InstancedMeshKey>,
-    material_key: InstancedMaterialKey<M>,
+    material_key: InstancedMaterialBatchKey<M>,
 }
 
 impl<M: SpecializedInstancedMaterial> Component for InstanceBatchKey<M> {
@@ -369,7 +369,7 @@ impl<M: SpecializedInstancedMaterial> Eq for InstanceBatchKey<M> {}
 
 impl<M: SpecializedInstancedMaterial> PartialOrd for InstanceBatchKey<M>
 where
-    M::Key: PartialOrd,
+    M::BatchKey: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         match self.mesh_key.partial_cmp(&other.mesh_key) {
@@ -382,7 +382,7 @@ where
 
 impl<M: SpecializedInstancedMaterial> Ord for InstanceBatchKey<M>
 where
-    M::Key: Ord,
+    M::BatchKey: Ord,
 {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.mesh_key.cmp(&other.mesh_key) {
@@ -402,7 +402,7 @@ impl<M: SpecializedInstancedMaterial> std::hash::Hash for InstanceBatchKey<M> {
 
 impl<M: SpecializedInstancedMaterial> std::fmt::Debug for InstanceBatchKey<M>
 where
-    M::Key: std::fmt::Debug,
+    M::BatchKey: std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InstanceKey")
@@ -440,12 +440,17 @@ impl<M: SpecializedInstancedMaterial> Default for InstanceViewMeta<M> {
     }
 }
 
+pub struct MaterialBatch<M: SpecializedInstancedMaterial> {
+    material: Handle<M>,
+    pipeline_key: M::PipelineKey,
+}
+
 /// Resource containing instance batches
 pub struct InstanceMeta<M: SpecializedInstancedMaterial> {
     pub instances: Vec<Entity>,
     pub instance_blocks: Vec<Entity>,
     pub mesh_batches: HashMap<Hashed<InstancedMeshKey>, MeshBatch>,
-    pub material_batches: HashMap<InstancedMaterialKey<M>, Handle<M>>,
+    pub material_batches: HashMap<InstancedMaterialBatchKey<M>, MaterialBatch<M>>,
     pub instance_batches: HashMap<InstanceBatchKey<M>, InstanceBatch<M>>,
     pub batched_instances: BTreeMap<InstanceBatchKey<M>, BatchedInstances>,
 }
@@ -747,9 +752,9 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
 
                 let material = render_materials.get(material_handle).unwrap();
                 let alpha_mode = GpuAlphaMode::from(M::alpha_mode(material));
-                let material_key = InstancedMaterialKey {
+                let material_key = InstancedMaterialBatchKey {
                     alpha_mode,
-                    key: M::key(material),
+                    key: M::batch_key(material),
                 };
 
                 let mesh_z =
@@ -811,9 +816,9 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
 
                 let material = render_materials.get(material_handle).unwrap();
                 let alpha_mode = GpuAlphaMode::from(M::alpha_mode(material));
-                let material_key = InstancedMaterialKey {
+                let material_key = InstancedMaterialBatchKey {
                     alpha_mode,
-                    key: M::key(material),
+                    key: M::batch_key(material),
                 };
 
                 let key = InstanceBatchKey {
@@ -989,11 +994,14 @@ pub fn prepare_material_batches<M: SpecializedInstancedMaterial>(
             .map(|material_handle| {
                 let material = render_materials.get(&material_handle).unwrap();
                 (
-                    InstancedMaterialKey {
+                    InstancedMaterialBatchKey {
                         alpha_mode: M::alpha_mode(material).into(),
-                        key: M::key(material),
+                        key: M::batch_key(material),
                     },
-                    material_handle,
+                    MaterialBatch {
+                        material: material_handle,
+                        pipeline_key: M::pipeline_key(material),
+                    },
                 )
             })
             .collect();
@@ -1001,10 +1009,9 @@ pub fn prepare_material_batches<M: SpecializedInstancedMaterial>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
+pub fn prepare_batched_instances<M: SpecializedInstancedMaterial>(
     instanced_material_pipeline: Res<InstancedMaterialPipeline<M>>,
     render_meshes: Res<GpuInstancedMeshes<M>>,
-    render_materials: Res<RenderAssets<M>>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
     render_device: Res<RenderDevice>,
     query_instance: Query<(
@@ -1027,36 +1034,6 @@ pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
     for view_entity in query_views.iter_mut() {
         info!("View {view_entity:?}");
         let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
-
-        // Collect set of visible materials
-        let materials = instance_meta
-            .instances
-            .iter()
-            .flat_map(|entity| query_instance.get(*entity))
-            .map(|(_, material, _, _)| material.clone_weak())
-            .chain(
-                instance_meta
-                    .instance_blocks
-                    .iter()
-                    .flat_map(|entity| query_instance_block.get(*entity))
-                    .map(|(_, material, _, _)| material.clone_weak()),
-            )
-            .collect::<BTreeSet<_>>();
-
-        // Batch materials by key
-        instance_meta.material_batches = materials
-            .into_iter()
-            .map(|material_handle| {
-                let material = render_materials.get(&material_handle).unwrap();
-                (
-                    InstancedMaterialKey {
-                        alpha_mode: M::alpha_mode(material).into(),
-                        key: M::key(material),
-                    },
-                    material_handle,
-                )
-            })
-            .collect();
 
         // Process batches
         let mut batched_instances = BTreeMap::<InstanceBatchKey<M>, BatchedInstances>::new();
@@ -1262,14 +1239,14 @@ pub fn prepare_instanced_materials<M: SpecializedInstancedMaterial>(
             }
 
             // Spawn entity
-            let material = instance_meta
+            let material_batch = instance_meta
                 .material_batches
                 .get(&key.material_key)
                 .unwrap();
 
             let batch_entity = commands
                 .spawn()
-                .insert(material.clone_weak())
+                .insert(material_batch.material.clone_weak())
                 .insert(key.clone())
                 .id();
 
@@ -1338,12 +1315,14 @@ pub fn queue_instanced_materials<M: SpecializedInstancedMaterial>(
                 mesh_key |= MeshPipelineKey::TRANSPARENT_MAIN_PASS;
             }
 
+            let material_batch = instance_meta.material_batches.get(&key.material_key).unwrap();
+
             let pipeline = pipelines.specialize(
                 &mut pipeline_cache,
                 &instanced_material_pipeline,
                 InstancedMaterialPipelineKey {
                     mesh_key,
-                    material_key: key.material_key.key.clone(),
+                    material_key: material_batch.pipeline_key.clone(),
                 },
                 &key.mesh_key.layout,
             );

@@ -1,4 +1,4 @@
-use bevy::asset::{Asset, AssetServer, Handle};
+use bevy::asset::{AssetServer, Handle};
 use bevy::pbr::AlphaMode;
 use bevy::render::{
     mesh::MeshVertexBufferLayout,
@@ -9,7 +9,7 @@ use bevy::render::{
     renderer::RenderDevice,
 };
 
-use crate::prelude::{InstancedMaterial, InstancedMaterialPipeline, Instance};
+use crate::prelude::{Instance, InstancedMaterial, InstancedMaterialPipeline};
 
 use std::hash::Hash;
 
@@ -18,9 +18,12 @@ use std::hash::Hash;
 /// way to render [`Mesh`] entities with custom shader logic. [`SpecializedMaterials`](SpecializedMaterial) use their [`SpecializedMaterial::Key`]
 /// to customize their [`RenderPipelineDescriptor`] based on specific material values. The slightly simpler [`Material`] trait
 /// should be used for materials that do not need specialization. [`Material`] types automatically implement [`SpecializedMaterial`].
-pub trait SpecializedInstancedMaterial: Asset + RenderAsset + Sized {
+pub trait SpecializedInstancedMaterial: RenderAsset + Sized {
     /// The key used to specialize this material's [`RenderPipelineDescriptor`].
-    type Key: Default + PartialEq + Eq + PartialOrd + Ord + Hash + Clone + Send + Sync;
+    type PipelineKey: PartialEq + Eq + Hash + Clone + Send + Sync;
+
+    /// The key used to batch instances of this material together
+    type BatchKey: PartialEq + Eq + PartialOrd + Ord + Hash + Clone + Send + Sync;
 
     /// Type used to store per-instance data
     type Instance: Instance;
@@ -28,13 +31,16 @@ pub trait SpecializedInstancedMaterial: Asset + RenderAsset + Sized {
     /// Extract the [`SpecializedInstancedMaterial::PipelineKey`] for the "prepared" version of this material. This key will be
     /// passed in to the [`SpecializedInstancedMaterial::specialize`] function when compiling the [`RenderPipeline`](bevy_render::render_resource::RenderPipeline)
     /// for a given entity's material.
-    fn key(material: &<Self as RenderAsset>::PreparedAsset) -> Self::Key;
+    fn pipeline_key(material: &<Self as RenderAsset>::PreparedAsset) -> Self::PipelineKey;
+
+    /// Extract the [`SpecializedInstancedMaterial::BatchKey`] for the "prepared" version of this material.
+    fn batch_key(material: &<Self as RenderAsset>::PreparedAsset) -> Self::BatchKey;
 
     /// Specializes the given `descriptor` according to the given `key`.
     fn specialize(
         pipeline: &InstancedMaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
-        key: Self::Key,
+        key: Self::PipelineKey,
         layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError>;
 
@@ -74,18 +80,22 @@ pub trait SpecializedInstancedMaterial: Asset + RenderAsset + Sized {
 }
 
 impl<M: InstancedMaterial> SpecializedInstancedMaterial for M {
-    type Key = ();
+    type PipelineKey = ();
+    type BatchKey = ();
 
     type Instance = M::Instance;
 
     #[inline]
-    fn key(_material: &<Self as RenderAsset>::PreparedAsset) -> Self::Key {}
+    fn pipeline_key(_material: &<Self as RenderAsset>::PreparedAsset) -> Self::PipelineKey {}
+
+    #[inline]
+    fn batch_key(_material: &<Self as RenderAsset>::PreparedAsset) -> Self::BatchKey {}
 
     #[inline]
     fn specialize(
         pipeline: &InstancedMaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
-        _key: Self::Key,
+        _key: Self::BatchKey,
         layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError> {
         <M as InstancedMaterial>::specialize(pipeline, descriptor, layout)
