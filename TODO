@@ -1,7 +1,5 @@
-TODO: Investigate spliting SpecializedInstancedMaterial::Key into InstanceKey and PipelineKey
-      * Currently coupling pipelines to mutually compatible sets of materials
-        * i.e. Materials that share both a bind group and parameter values
-      * In theory pipelines should be able to key separately, resulting in less duplication
+TODO: Texture-consuming instanced material and accompanying example scene
+      * Need to prove concept w.r.t. BatchKey allowing different bindings to work with the same pipeline
 
 TODO: Uniform support for instance buffer
       * Need to split instances into
@@ -21,6 +19,7 @@ TODO: Specialization for compute shaders that operate on a MeshInstanceBlock
       * Effectively a generalization of the current board compute module
       * Should resemble SpecializedInstancedMaterial
       * InstanceComputeKernel?
+      * SpecializedComputePipeline is worth investigating; may be able to leverage
 
 TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances
