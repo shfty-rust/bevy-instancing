@@ -1,19 +1,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, Entity, Handle, Mesh, Query, Res, ResMut, With},
+    prelude::{debug, default, info, Entity, Handle, Mesh, Query, Res, ResMut, With},
     render::{
         mesh::Indices,
         view::{ExtractedView, VisibleEntities},
     },
 };
-use wgpu::util::{DrawIndexedIndirect, DrawIndirect};
+use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
 
 use crate::instancing::{
     instance_block::InstanceBlock,
     material::{
         plugin::{
-            DrawIndirectVariant, GpuIndexBufferData, GpuInstancedMeshes, InstanceViewMeta,
+            GpuIndexBufferData, GpuIndirectData, GpuInstancedMeshes, InstanceViewMeta,
             InstancedMeshKey, MeshBatch,
         },
         specialized_instanced_material::SpecializedInstancedMaterial,
@@ -144,29 +144,44 @@ pub fn system<M: SpecializedInstancedMaterial>(
                 });
 
                 let mut base_index = 0u32;
-                let indirect_data = meshes
-                    .iter()
-                    .map(
-                        |mesh| match &render_meshes.get(mesh).unwrap().index_buffer_data {
-                            GpuIndexBufferData::Indexed { index_count, .. } => {
-                                base_index += index_count;
+                let indirect_data = match key.index_format {
+                    Some(_) => GpuIndirectData::Indexed {
+                        buffer: meshes
+                            .iter()
+                            .map(
+                                |mesh| match &render_meshes.get(mesh).unwrap().index_buffer_data {
+                                    GpuIndexBufferData::Indexed { index_count, .. } => {
+                                        base_index += index_count;
 
-                                DrawIndirectVariant::Indexed(DrawIndexedIndirect {
-                                    vertex_count: *index_count,
-                                    ..default()
-                                })
-                            }
-                            GpuIndexBufferData::NonIndexed { vertex_count } => {
-                                base_index += vertex_count;
+                                        DrawIndexedIndirect {
+                                            vertex_count: *index_count,
+                                            ..default()
+                                        }
+                                    }
+                                    _ => panic!("Mismatched GpuIndexBufferData"),
+                                },
+                            )
+                            .collect::<Vec<_>>(),
+                    },
+                    None => GpuIndirectData::NonIndexed {
+                        buffer: meshes
+                            .iter()
+                            .map(
+                                |mesh| match &render_meshes.get(mesh).unwrap().index_buffer_data {
+                                    GpuIndexBufferData::NonIndexed { vertex_count } => {
+                                        base_index += vertex_count;
 
-                                DrawIndirectVariant::NonIndexed(DrawIndirect {
-                                    vertex_count: *vertex_count,
-                                    ..default()
-                                })
-                            }
-                        },
-                    )
-                    .collect::<Vec<_>>();
+                                        DrawIndirect {
+                                            vertex_count: *vertex_count,
+                                            ..default()
+                                        }
+                                    }
+                                    _ => panic!("Mismatched GpuIndexBufferData"),
+                                },
+                            )
+                            .collect::<Vec<_>>(),
+                    },
+                };
 
                 (
                     key.clone(),

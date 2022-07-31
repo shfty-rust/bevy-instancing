@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, Entity, Handle, Mesh, Query, Res, ResMut, With},
+    prelude::{debug, default, info, Entity, Handle, Mesh, Query, Res, ResMut, With},
     render::{
         render_asset::RenderAssets,
         renderer::RenderDevice,
@@ -168,8 +168,10 @@ pub fn system<M: SpecializedInstancedMaterial>(
 
         let span = bevy::prelude::info_span!("Populate instances");
         span.in_scope(|| {
+            debug!("Populating instances");
             // Populate instances
             for (key, instances) in keyed_instances.iter() {
+                debug!("{key:#?}");
                 // Collect instance data
                 let instance_buffer_data =
                     instances
@@ -193,6 +195,7 @@ pub fn system<M: SpecializedInstancedMaterial>(
 
         let span = bevy::prelude::info_span!("Create instance block ranges");
         let mut keyed_instance_block_ranges = span.in_scope(|| {
+            debug!("Creating instance block ranges");
             // Create instance block ranges
             keyed_instance_blocks
                 .iter()

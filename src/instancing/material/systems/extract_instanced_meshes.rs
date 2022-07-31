@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, Assets, Commands, Handle, Mesh, Query, Res, With},
+    prelude::{debug, default, Assets, Commands, Handle, Mesh, Query, Res, With, info},
     render::Extract,
 };
 

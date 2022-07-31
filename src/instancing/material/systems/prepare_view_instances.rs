@@ -1,5 +1,5 @@
 use bevy::{
-    prelude::{debug, Entity, Handle, Query, ResMut, With},
+    prelude::{info, Entity, Handle, Query, ResMut, With, debug},
     render::view::{ExtractedView, VisibleEntities},
 };
 

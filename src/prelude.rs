@@ -1,6 +1,7 @@
 pub use crate::{
     colored_mesh_instance::{color_instance_bundle::*, mesh_instance_color::*, plugin::*, *},
     instancing::{
+        indirect::*,
         instance_block::{instance_block_bundle::*, *},
         material::{
             instanced_material::*, instanced_material_pipeline::*, plugin::*,
@@ -8,10 +9,7 @@ pub use crate::{
         },
         mesh_instance::{mesh_instance_bundle::*, *},
         plugin::*,
-        render::{
-            instance::*, instanced_mesh_pipeline::*,
-            set_instanced_mesh_bind_group::*, *,
-        },
+        render::{instance::*, instanced_mesh_pipeline::*, set_instanced_mesh_bind_group::*, *},
         *,
     },
     materials::{

@@ -1,30 +1,29 @@
 use std::collections::BTreeMap;
 
 use bevy::{
-    prelude::{debug, Commands, Entity, Handle, Mesh, Query, Res, ResMut, With},
+    prelude::{debug, info, Commands, Entity, Handle, Mesh, Query, Res, ResMut, With},
     render::{
         mesh::Indices,
+        render_resource::BufferVec,
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
     },
 };
-use wgpu::{
-    util::{BufferInitDescriptor, DrawIndexedIndirect, DrawIndirect},
-    BindGroupDescriptor, BindGroupEntry, BufferUsages,
-};
+use wgpu::{util::BufferInitDescriptor, BindGroupDescriptor, BindGroupEntry, BufferUsages};
 
 use crate::instancing::{
     instance_block::{InstanceBlock, InstanceBlockBuffer},
     material::{
         instanced_material_pipeline::InstancedMaterialPipeline,
         plugin::{
-            BatchedInstances, DrawIndirectVariant, GpuIndexBufferData, GpuInstancedMeshes,
-            InstanceBatchKey, InstanceViewMeta, MeshBatch,
+            BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
+            GpuInstancedMeshes, InstanceBatchKey, InstanceViewMeta, MeshBatch,
         },
         specialized_instanced_material::SpecializedInstancedMaterial,
     },
     render::instance::Instance,
 };
+use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
 
 #[allow(clippy::too_many_arguments)]
 pub fn system<M: SpecializedInstancedMaterial>(
@@ -138,10 +137,11 @@ pub fn system<M: SpecializedInstancedMaterial>(
                 _ => None,
             };
 
-            let indirect_buffer = match key.mesh_key.index_format {
-                Some(_) => {
-                    let indirect_data = indirect_data
+            let indirect_buffer = match indirect_data {
+                GpuIndirectData::Indexed { buffer } => {
+                    let indirect_data = buffer
                         .into_iter()
+                        .copied()
                         .zip(
                             mesh_instance_counts.values().zip(
                                 mesh_vertex_offsets
@@ -150,42 +150,32 @@ pub fn system<M: SpecializedInstancedMaterial>(
                             ),
                         )
                         .map(
-                            |(variant, (instance_count, (index_offset, instance_offset)))| {
-                                let indirect =
-                                    if let DrawIndirectVariant::Indexed(indirect) = variant {
-                                        indirect
-                                    } else {
-                                        panic!("Mismatched DrawIndirectVariant");
-                                    };
-
-                                let indirect = DrawIndexedIndirect {
+                            |(indirect, (instance_count, (index_offset, instance_offset)))| {
+                                DrawIndexedIndirect {
                                     instance_count: *instance_count as u32,
                                     base_index: *index_offset as u32,
                                     base_instance: *instance_offset as u32,
-                                    ..*indirect
-                                };
-
-                                indirect
+                                    ..indirect
+                                }
                             },
                         )
                         .collect::<Vec<_>>();
 
-                    debug!("Indirect data: {indirect_data:#?}");
+                    let mut indirect_buffer = BufferVec::new(BufferUsages::INDIRECT);
+                    for indirect in &indirect_data {
+                        indirect_buffer.push(*indirect);
+                    }
+                    indirect_buffer.write_buffer(&render_device, &render_queue);
 
-                    render_device.create_buffer_with_data(&BufferInitDescriptor {
-                        label: Some("indirect buffer"),
-                        contents: indirect_data
-                            .iter()
-                            .flat_map(|indirect| indirect.as_bytes())
-                            .copied()
-                            .collect::<Vec<_>>()
-                            .as_slice(),
-                        usage: BufferUsages::INDIRECT,
-                    })
+                    GpuIndirectBufferData::Indexed {
+                        indirects: indirect_data,
+                        buffer: indirect_buffer,
+                    }
                 }
-                None => {
-                    let indirect_data = indirect_data
+                GpuIndirectData::NonIndexed { buffer } => {
+                    let indirect_data = buffer
                         .into_iter()
+                        .copied()
                         .zip(
                             mesh_instance_counts.values().zip(
                                 mesh_vertex_offsets
@@ -194,14 +184,7 @@ pub fn system<M: SpecializedInstancedMaterial>(
                             ),
                         )
                         .map(
-                            |(variant, (instance_count, (vertex_offset, instance_offset)))| {
-                                let indirect =
-                                    if let DrawIndirectVariant::NonIndexed(indirect) = variant {
-                                        *indirect
-                                    } else {
-                                        panic!("Mismatched DrawIndirectVariant");
-                                    };
-
+                            |(indirect, (instance_count, (vertex_offset, instance_offset)))| {
                                 DrawIndirect {
                                     instance_count: *instance_count as u32,
                                     base_vertex: *vertex_offset as u32,
@@ -212,16 +195,16 @@ pub fn system<M: SpecializedInstancedMaterial>(
                         )
                         .collect::<Vec<_>>();
 
-                    render_device.create_buffer_with_data(&BufferInitDescriptor {
-                        label: Some("indirect buffer"),
-                        contents: indirect_data
-                            .iter()
-                            .flat_map(|indirect| indirect.as_bytes())
-                            .copied()
-                            .collect::<Vec<_>>()
-                            .as_slice(),
-                        usage: BufferUsages::INDIRECT,
-                    })
+                    let mut indirect_buffer = BufferVec::new(BufferUsages::INDIRECT);
+                    for indirect in &indirect_data {
+                        indirect_buffer.push(*indirect);
+                    }
+                    indirect_buffer.write_buffer(&render_device, &render_queue);
+
+                    GpuIndirectBufferData::NonIndexed {
+                        indirects: indirect_data,
+                        buffer: indirect_buffer,
+                    }
                 }
             };
 
@@ -284,8 +267,8 @@ pub fn system<M: SpecializedInstancedMaterial>(
                     vertex_buffer,
                     index_data: index_buffer
                         .map(|index_buffer| (index_buffer, key.mesh_key.index_format.unwrap())),
-                    indirect_buffer,
                     instance_bind_group,
+                    indirect_buffer,
                     indirect_count,
                     indirect_indices,
                 },

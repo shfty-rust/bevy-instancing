@@ -1,7 +1,7 @@
 use bevy::{
     core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
     pbr::MeshPipelineKey,
-    prelude::{debug, error, Msaa, Query, Res, ResMut},
+    prelude::{debug, error, Msaa, Query, Res, ResMut, info},
     render::{
         render_phase::{DrawFunctions, RenderPhase},
         render_resource::{PipelineCache, SpecializedMeshPipelines},

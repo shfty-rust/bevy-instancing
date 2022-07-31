@@ -7,8 +7,6 @@ use bevy::{
     math::{Mat4, Vec4},
     prelude::{default, Component}, render::render_resource::ShaderType, 
 };
-use bytemuck::{Pod, Zeroable};
-
 use crate::prelude::{GpuMeshInstance, Instance, InstanceColor, MeshInstance};
 
 #[derive(Debug, Default, Clone, PartialEq, Component)]
@@ -18,7 +16,7 @@ pub struct ColorMeshInstance {
 }
 
 /// GPU-friendly data for a since mesh instance
-#[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable, ShaderType, Component)]
+#[derive(Debug, Copy, Clone, PartialEq, ShaderType, Component)]
 #[repr(C)]
 pub struct GpuColorMeshInstance {
     pub base: GpuMeshInstance,

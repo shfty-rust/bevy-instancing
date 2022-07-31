@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use bevy::{
-    prelude::{debug, Entity, Handle, Query, Res, ResMut, With},
+    prelude::{debug, Entity, Handle, Query, Res, ResMut, With, info},
     render::{
         render_asset::RenderAssets,
         view::{ExtractedView, VisibleEntities},

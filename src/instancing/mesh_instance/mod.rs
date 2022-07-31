@@ -9,8 +9,6 @@ use bevy::{
     },
     render::{render_resource::ShaderType, Extract},
 };
-use bytemuck::{Pod, Zeroable};
-
 use crate::prelude::Instance;
 
 use super::material::specialized_instanced_material::SpecializedInstancedMaterial;
@@ -21,11 +19,11 @@ pub struct MeshInstance {
     pub transform: Mat4,
 }
 
-#[derive(Debug, Copy, Clone, Pod, Zeroable, ShaderType, Component)]
+#[derive(Debug, Copy, Clone, ShaderType, Component)]
 #[repr(C)]
 pub struct GpuMeshInstance {
+    #[size(16)]
     pub mesh: u32,
-    pub _padding: [u32; 3],
     pub transform: Mat4,
     pub inverse_transpose_model: Mat4,
 }
@@ -54,7 +52,6 @@ impl Default for GpuMeshInstance {
     fn default() -> Self {
         Self {
             mesh: default(),
-            _padding: default(),
             transform: Mat4::ZERO,
             inverse_transpose_model: Mat4::ZERO,
         }
