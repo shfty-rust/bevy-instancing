@@ -1,14 +1,17 @@
 #import indirect_instancing::instance_struct
 #import indirect_instancing::indirect_struct
 
-[[group(0), binding(0)]]
+@group(0)
+@binding(0)
 var<storage, read> in_instances: Instances;
 
-[[group(0), binding(1)]]
+@group(0)
+@binding(1)
 var<storage, read_write> out_indirects: IndirectDrawCommands;
 
-[[stage(compute), workgroup_size(64)]]
-fn indirect_offsets([[builtin(global_invocation_id)]] invocation_id: vec3<u32>) {
+@compute
+@workgroup_size(64)
+fn indirect_offsets(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
     // Calculate maximum indices
     let max_instance = arrayLength(&in_instances.instances);
     let max_mesh = arrayLength(&out_indirects.indirects);

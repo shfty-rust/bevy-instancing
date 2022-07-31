@@ -4,7 +4,7 @@ use bevy::{
     ecs::{reflect::ReflectComponent, system::lifetimeless::Read},
     prelude::Component,
     reflect::Reflect,
-    render::{render_component::ExtractComponent, render_resource::Buffer},
+    render::{extract_component::ExtractComponent, render_resource::Buffer},
 };
 
 /// Allocates a contiguous block of the instance buffer corresponding to a given material

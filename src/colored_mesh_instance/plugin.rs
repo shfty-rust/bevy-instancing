@@ -4,8 +4,6 @@ use bevy::{
     reflect::TypeUuid,
 };
 
-use bevy::asset as bevy_asset;
-
 use crate::prelude::InstanceColor;
 
 pub const COLOR_INSTANCE_STRUCT_HANDLE: HandleUntyped =

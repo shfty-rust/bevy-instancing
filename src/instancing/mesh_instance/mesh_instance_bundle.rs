@@ -1,7 +1,4 @@
-use bevy::{
-    prelude::{Bundle, ComputedVisibility, Handle, Mesh, Visibility},
-    transform::TransformBundle,
-};
+use bevy::prelude::{Bundle, Handle, Mesh, SpatialBundle};
 
 use crate::prelude::SpecializedInstancedMaterial;
 
@@ -11,7 +8,5 @@ pub struct MeshInstanceBundle<M: SpecializedInstancedMaterial> {
     pub material: Handle<M>,
     pub mesh: Handle<Mesh>,
     #[bundle]
-    pub transform: TransformBundle,
-    pub visibility: Visibility,
-    pub computed_visibility: ComputedVisibility,
+    pub spatial_bundle: SpatialBundle,
 }

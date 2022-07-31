@@ -1,17 +1,17 @@
 pub mod mesh_instance_bundle;
 
 use bevy::{
-    ecs::system::lifetimeless::Read,
+    ecs::{query::ROQueryItem, system::lifetimeless::Read},
     math::{Mat4, Vec3},
     prelude::{
         default, Commands, Component, ComputedVisibility, Entity, GlobalTransform, Handle, Mesh,
         Query,
     },
-    render::render_resource::{std140::AsStd140, std430::AsStd430},
+    render::{render_resource::ShaderType, Extract},
 };
 use bytemuck::{Pod, Zeroable};
 
-use crate::prelude::{Instance, ReadOnlyQueryItem};
+use crate::prelude::Instance;
 
 use super::material::specialized_instanced_material::SpecializedInstancedMaterial;
 
@@ -21,7 +21,7 @@ pub struct MeshInstance {
     pub transform: Mat4,
 }
 
-#[derive(Debug, Copy, Clone, Pod, Zeroable, AsStd140, AsStd430, Component)]
+#[derive(Debug, Copy, Clone, Pod, Zeroable, ShaderType, Component)]
 #[repr(C)]
 pub struct GpuMeshInstance {
     pub mesh: u32,
@@ -72,14 +72,13 @@ impl Instance for MeshInstance {
     );
 
     fn extract_instance<'w>(
-        (mesh, transform, visibility): ReadOnlyQueryItem<Self::Query>,
+        (mesh, transform, visibility): ROQueryItem<Self::Query>,
     ) -> Self::ExtractedInstance {
-        let transform = if visibility.is_visible {
-            *transform
+        let transform = if visibility.is_visible() {
+            transform.compute_matrix()
         } else {
-            transform.with_scale(Vec3::ZERO)
-        }
-        .compute_matrix();
+            Mat4::ZERO
+        };
 
         MeshInstance {
             mesh: mesh.clone_weak(),
@@ -102,7 +101,7 @@ impl Instance for MeshInstance {
 }
 
 pub fn extract_mesh_instances<M: SpecializedInstancedMaterial>(
-    query_mesh_instance: Query<(Entity, <M::Instance as Instance>::Query)>,
+    query_mesh_instance: Extract<Query<(Entity, <M::Instance as Instance>::Query)>>,
     mut commands: Commands,
 ) {
     for (entity, item) in query_mesh_instance.iter() {

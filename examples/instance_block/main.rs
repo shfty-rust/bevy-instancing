@@ -9,14 +9,13 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 use std::num::NonZeroU64;
 
-use bevy::asset as bevy_asset;
-use bevy::core::Time;
-use bevy::core_pipeline::node::MAIN_PASS_DEPENDENCIES;
 use bevy::ecs::system::lifetimeless::Read;
 use bevy::math::Vec4;
-use bevy::prelude::{info, Component, Entity, FromWorld, Handle, Query, Res, With, World, Color};
+use bevy::prelude::{
+    info, Camera3dBundle, Color, Component, Entity, FromWorld, Handle, Query, Res, With, World,
+};
 use bevy::reflect::TypeUuid;
-use bevy::render::render_component::{ExtractComponent, ExtractComponentPlugin};
+use bevy::render::extract_component::{ExtractComponentPlugin, ExtractComponent};
 use bevy::render::render_graph::{Node, NodeLabel, RenderGraph};
 use bevy::render::render_resource::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
@@ -26,6 +25,7 @@ use bevy::render::render_resource::{
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::{RenderApp, RenderStage};
+use bevy::time::Time;
 use bevy::{
     asset::load_internal_asset,
     core::Name,
@@ -34,17 +34,15 @@ use bevy::{
     prelude::{
         default,
         shape::{Cube, Icosphere},
-        App, Assets, Commands, HandleUntyped, Mesh, PerspectiveCameraBundle, Plugin, ResMut,
-        Shader, Transform,
+        App, Assets, Commands, HandleUntyped, Mesh, Plugin, ResMut, Shader, Transform,
     },
-    render::camera::Camera3d,
     DefaultPlugins,
 };
 
 use bevy_instancing::prelude::{
     CustomMaterial, CustomMaterialPlugin, GpuColorMeshInstance, IndirectRenderingPlugin,
     InstanceBlock, InstanceBlockBuffer, InstanceBlockBundle, InstanceBlockRange,
-    SpecializedInstancedMaterial, 
+    SpecializedInstancedMaterial,
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -107,7 +105,10 @@ impl<M: SpecializedInstancedMaterial> Plugin for InstanceComputePlugin<M> {
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
         render_graph.add_node(InstanceCompute, InstanceComputeNode);
         render_graph
-            .add_node_edge(InstanceCompute, MAIN_PASS_DEPENDENCIES)
+            .add_node_edge(
+                InstanceCompute,
+                bevy::render::main_graph::node::CAMERA_DRIVER,
+            )
             .unwrap();
     }
 }
@@ -205,7 +206,7 @@ impl Node for InstanceComputeNode {
                     (compute_job.instance_count / WORKGROUP_SIZE).max(1) as u32;
 
                 pass.set_pipeline(instance_pipeline);
-                pass.dispatch(instance_workgroups, 1, 1);
+                pass.dispatch_workgroups(instance_workgroups, 1, 1);
             }
         }
 
@@ -309,9 +310,9 @@ fn setup_instancing(
     mut commands: Commands,
 ) {
     // Perspective camera
-    commands.spawn_bundle(PerspectiveCameraBundle::<Camera3d> {
+    commands.spawn_bundle(Camera3dBundle {
         transform: Transform::from_xyz(-50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..PerspectiveCameraBundle::new()
+        ..default()
     });
 
     // Directional Light

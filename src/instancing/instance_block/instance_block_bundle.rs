@@ -1,6 +1,6 @@
 use bevy::prelude::{Bundle, ComputedVisibility, Handle, Mesh, Visibility};
 
-use crate::prelude::{SpecializedInstancedMaterial, InstanceBlock};
+use crate::prelude::{InstanceBlock, SpecializedInstancedMaterial};
 
 /// Components to create a mesh instance
 #[derive(Default, Bundle)]

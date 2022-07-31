@@ -1,31 +1,32 @@
-#import bevy_pbr::mesh_view_bind_group
-#import bevy_pbr::mesh_struct
+#import bevy_pbr::mesh_view_bindings
 #import indirect_instancing::color_instance_struct
 
 #ifdef NO_STORAGE_BUFFERS_SUPPORT
-[[group(2), binding(0)]]
+@group(2)
+@binding(0)
 var<uniform> instances: ColorInstances;
 #else
-[[group(2), binding(0)]]
+@group(2)
+@binding(0)
 var<storage> instances: ColorInstances;
 #endif
 
 struct VertexInput {
-    [[builtin(instance_index)]] instance: u32;
-    [[location(0)]] vertex: vec3<f32>;
-    [[location(1)]] normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
+    @builtin(instance_index) instance: u32,
+    @location(0) vertex: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 };
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] vertex: vec3<f32>;
-    [[location(2)]] normal: vec3<f32>;
-    [[location(3)]] color: vec4<f32>;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) vertex: vec3<f32>,
+    @location(2) normal: vec3<f32>,
+    @location(3) color: vec4<f32>,
 };
 
-[[stage(vertex)]]
+@vertex
 fn vertex(in: VertexInput) -> VertexOutput {
     let instance = instances.instances[in.instance];
 
@@ -45,14 +46,14 @@ fn luminance(v: vec3<f32>) -> f32 {
     return dot(v, vec3<f32>(0.2126, 0.7152, 0.0722));
 }
 
-[[stage(fragment)]]
-fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     let grad_size = fwidth(in.world_position.xyz);
     let margin_max = 0.5 - margin_size;
     let margin_min = -margin_max;
     let stripe_axis = 
-            smoothStep(vec3<f32>(margin_min), vec3<f32>(margin_min) + grad_size, in.vertex) *
-            smoothStep(vec3<f32>(margin_max), vec3<f32>(margin_max) - grad_size, in.vertex);
+            smoothstep(vec3<f32>(margin_min), vec3<f32>(margin_min) + grad_size, in.vertex) *
+            smoothstep(vec3<f32>(margin_max), vec3<f32>(margin_max) - grad_size, in.vertex);
     let stripe_fac = max(stripe_axis.x + stripe_axis.y + stripe_axis.z, 1.0);
     let stripe = mix(0.0, 1.0, stripe_fac);
 

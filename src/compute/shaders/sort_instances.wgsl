@@ -1,17 +1,18 @@
 #import indirect_instancing::instance_struct
 #import indirect_instancing::indirect_struct
 
-[[group(0), binding(0)]]
+@group(0), binding(0)
 var<storage, read> in_instances: Instances;
 
-[[group(0), binding(1)]]
+@group(0), binding(1)
 var<storage, read_write> out_indirects: IndirectDrawCommands;
 
-[[group(0), binding(2)]]
+@group(0), binding(2)
 var<storage, read_write> out_instances: Instances;
 
 
-[[stage(compute), workgroup_size(64)]]
+@compute
+@workgroup_size(64)
 fn sort_instances([[builtin(global_invocation_id)]] invocation_id: vec3<u32>) {
     // Destructure instance index
     let instance_idx = invocation_id.x;

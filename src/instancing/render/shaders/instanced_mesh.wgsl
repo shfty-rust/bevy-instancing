@@ -1,30 +1,31 @@
-#import bevy_pbr::mesh_view_bind_group
-#import bevy_pbr::mesh_struct
+#import bevy_pbr::mesh_view_bindings
 #import indirect_instancing::instance_struct
 
 #ifdef NO_STORAGE_BUFFERS_SUPPORT
-[[group(2), binding(0)]]
+@group(2)
+@binding(0)
 var<uniform> instances: Instances;
 #else
-[[group(2), binding(0)]]
+@group(2)
+@binding(0)
 var<storage> instances: Instances;
 #endif
 
 struct Vertex {
-    [[builtin(instance_index)]] instance: u32;
-    [[location(0)]] vertex: vec3<f32>;
-    [[location(1)]] normal: vec3<f32>;
-    [[location(2)]] uv: vec2<f32>;
+    @builtin(instance_index) instance: u32,
+    @location(0) vertex: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
 };
 
 struct VertexOutput {
-    [[builtin(position)]] clip_position: vec4<f32>;
-    [[location(0)]] world_position: vec4<f32>;
-    [[location(1)]] vertex: vec3<f32>;
-    [[location(2)]] normal: vec3<f32>;
+    @builtin(position) clip_position: vec4<f32>,
+    @location(0) world_position: vec4<f32>,
+    @location(1) vertex: vec3<f32>,
+    @location(2) normal: vec3<f32>,
 };
 
-[[stage(vertex)]]
+@vertex
 fn vertex(in: Vertex) -> VertexOutput {
     let instance = instances.instances[in.instance];
 
@@ -36,7 +37,7 @@ fn vertex(in: Vertex) -> VertexOutput {
     return out;
 }
 
-[[stage(fragment)]]
-fn fragment(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+@fragment
+fn fragment(in: VertexOutput) -> @location(0) vec4<f32> {
     return vec4<f32>(1.0, 0.0, 1.0, 1.0);
 }

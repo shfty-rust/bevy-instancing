@@ -1,21 +1,16 @@
 use bevy::{
     core::Name,
-    core_pipeline::{AlphaMask3d, Opaque3d, Transparent3d},
     math::{Quat, Vec3},
     pbr::{AlphaMode, DirectionalLight, DirectionalLightBundle},
     prelude::{
         default,
         shape::{Cube, Icosphere, Quad, Torus, UVSphere},
-        App, AssetServer, Assets, Camera, Color, Commands, Component, EventWriter, Handle, Mesh,
-        PerspectiveCameraBundle, PerspectiveProjection, Plugin, Res, ResMut, Transform, World,
+        App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, EventWriter, Handle,
+        Mesh, PerspectiveProjection, Res, ResMut, SpatialBundle, Transform,
     },
     render::{
-        camera::{ActiveCamera, Camera3d, CameraTypePlugin, RenderTarget},
-        render_graph::{NodeRunError, RenderGraph, RenderGraphContext, SlotValue},
-        render_phase::RenderPhase,
+        camera::{Projection, RenderTarget},
         render_resource::Face,
-        renderer::RenderContext,
-        RenderApp, RenderStage,
     },
     window::{CreateWindow, PresentMode, WindowDescriptor, WindowId},
     DefaultPlugins,
@@ -33,7 +28,6 @@ fn main() {
     let mut app = App::default();
 
     app.add_plugins(DefaultPlugins)
-        .add_plugin(SecondWindowCameraPlugin)
         .add_plugin(IndirectRenderingPlugin)
         .add_plugin(BasicMaterialPlugin)
         .add_plugin(CustomMaterialPlugin)
@@ -44,70 +38,6 @@ fn main() {
     app.run()
 }
 
-struct SecondWindowCameraPlugin;
-impl Plugin for SecondWindowCameraPlugin {
-    fn build(&self, app: &mut App) {
-        // adds the `ActiveCamera<SecondWindowCamera3d>` resource and extracts the camera into the render world
-        app.add_plugin(CameraTypePlugin::<SecondWindowCamera3d>::default());
-
-        let render_app = app.sub_app_mut(RenderApp);
-
-        // add `RenderPhase<Opaque3d>`, `RenderPhase<AlphaMask3d>` and `RenderPhase<Transparent3d>` camera phases
-        render_app.add_system_to_stage(RenderStage::Extract, extract_second_camera_phases);
-
-        // add a render graph node that executes the 3d subgraph
-        let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
-        let second_window_node = render_graph.add_node("second_window_cam", SecondWindowDriverNode);
-        render_graph
-            .add_node_edge(
-                bevy::core_pipeline::node::MAIN_PASS_DEPENDENCIES,
-                second_window_node,
-            )
-            .unwrap();
-        render_graph
-            .add_node_edge(
-                bevy::core_pipeline::node::CLEAR_PASS_DRIVER,
-                second_window_node,
-            )
-            .unwrap();
-    }
-}
-
-struct SecondWindowDriverNode;
-impl bevy::render::render_graph::Node for SecondWindowDriverNode {
-    fn run(
-        &self,
-        graph: &mut RenderGraphContext,
-        _: &mut RenderContext,
-        world: &World,
-    ) -> Result<(), NodeRunError> {
-        if let Some(camera) = world.resource::<ActiveCamera<SecondWindowCamera3d>>().get() {
-            graph.run_sub_graph(
-                bevy::core_pipeline::draw_3d_graph::NAME,
-                vec![SlotValue::Entity(camera)],
-            )?;
-        }
-
-        Ok(())
-    }
-}
-
-fn extract_second_camera_phases(
-    mut commands: Commands,
-    active: Res<ActiveCamera<SecondWindowCamera3d>>,
-) {
-    if let Some(entity) = active.get() {
-        commands.get_or_spawn(entity).insert_bundle((
-            RenderPhase::<Opaque3d>::default(),
-            RenderPhase::<AlphaMask3d>::default(),
-            RenderPhase::<Transparent3d>::default(),
-        ));
-    }
-}
-
-#[derive(Component, Default)]
-struct SecondWindowCamera3d;
-
 fn setup_instancing(
     asset_server: Res<AssetServer>,
     mut create_window_events: EventWriter<CreateWindow>,
@@ -116,19 +46,6 @@ fn setup_instancing(
     mut texture_materials: ResMut<Assets<TextureMaterial>>,
     mut commands: Commands,
 ) {
-    let window_id = WindowId::new();
-
-    // Perspective camera
-    commands.spawn_bundle(PerspectiveCameraBundle::<Camera3d> {
-        transform: Transform::from_xyz(-50.0, 50.0, 50.0)
-            .looking_at(Vec3::new(0.0, 12.0, 0.0), Vec3::Y),
-        perspective_projection: PerspectiveProjection {
-            fov: 15.0f32.to_radians(),
-            ..default()
-        },
-        ..PerspectiveCameraBundle::new()
-    });
-
     // Directional Light
     commands.spawn().insert_bundle(DirectionalLightBundle {
         directional_light: DirectionalLight {
@@ -143,33 +60,44 @@ fn setup_instancing(
         ..default()
     });
 
+    // main camera
+    commands.spawn_bundle(Camera3dBundle {
+        transform: Transform::from_xyz(-50.0, 50.0, 50.0)
+            .looking_at(Vec3::new(0.0, 12.0, 0.0), Vec3::Y),
+        projection: Projection::Perspective(PerspectiveProjection {
+            fov: 15.0f32.to_radians(),
+            ..default()
+        }),
+        ..default()
+    });
+
     if USE_SECOND_CAMERA {
+        let window_id = WindowId::new();
+
         // sends out a "CreateWindow" event, which will be received by the windowing backend
         create_window_events.send(CreateWindow {
             id: window_id,
             descriptor: WindowDescriptor {
                 width: 800.,
                 height: 600.,
-                present_mode: PresentMode::Immediate,
+                present_mode: PresentMode::AutoNoVsync,
                 title: "Second window".to_string(),
                 ..default()
             },
         });
 
         // second window camera
-        commands.spawn_bundle(PerspectiveCameraBundle {
+        commands.spawn_bundle(Camera3dBundle {
+            transform: Transform::from_xyz(50.0, 0.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
             camera: Camera {
                 target: RenderTarget::Window(window_id),
                 ..default()
             },
-            perspective_projection: PerspectiveProjection {
+            projection: Projection::Perspective(PerspectiveProjection {
                 fov: 15.0f32.to_radians(),
                 ..default()
-            },
-            transform: Transform::from_xyz(50.0, 0.0, 50.0)
-                .looking_at(Vec3::new(0.0, 12.0, 0.0), Vec3::Y),
-            marker: SecondWindowCamera3d,
-            ..PerspectiveCameraBundle::new()
+            }),
+            ..default()
         });
     }
 
@@ -314,7 +242,10 @@ fn setup_instancing(
             .insert_bundle(MeshInstanceBundle::<BasicMaterial> {
                 mesh: mesh.clone(),
                 material: material_basic.clone(),
-                transform: Transform::from_xyz(x as f32 * 1.5, 0.0, 0.0).into(),
+                spatial_bundle: SpatialBundle {
+                    transform: Transform::from_xyz(x as f32 * 1.5, 0.0, 0.0).into(),
+                    ..default()
+                },
                 ..default()
             });
 
@@ -328,12 +259,15 @@ fn setup_instancing(
                         instance_bundle: MeshInstanceBundle {
                             mesh: mesh.clone(),
                             material: material.clone(),
-                            transform: Transform::from_xyz(
-                                x as f32 * 1.5,
-                                1.5 + y as f32 * 1.5,
-                                z as f32 * -1.5,
-                            )
-                            .into(),
+                            spatial_bundle: SpatialBundle {
+                                transform: Transform::from_xyz(
+                                    x as f32 * 1.5,
+                                    1.5 + y as f32 * 1.5,
+                                    z as f32 * -1.5,
+                                )
+                                .into(),
+                                ..default()
+                            },
                             ..default()
                         },
                         mesh_instance_color: color.into(),
@@ -350,12 +284,15 @@ fn setup_instancing(
                         instance_bundle: MeshInstanceBundle {
                             mesh: mesh.clone(),
                             material: material.clone(),
-                            transform: Transform::from_xyz(
-                                x as f32 * 1.5,
-                                1.5 + y as f32 * 1.5,
-                                z as f32 * -1.5,
-                            )
-                            .into(),
+                            spatial_bundle: SpatialBundle {
+                                transform: Transform::from_xyz(
+                                    x as f32 * 1.5,
+                                    1.5 + y as f32 * 1.5,
+                                    z as f32 * -1.5,
+                                )
+                                .into(),
+                                ..default()
+                            },
                             ..default()
                         },
                         mesh_instance_color: color.into(),

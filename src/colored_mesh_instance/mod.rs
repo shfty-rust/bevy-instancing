@@ -3,13 +3,13 @@ pub mod mesh_instance_color;
 pub mod plugin;
 
 use bevy::{
-    ecs::system::lifetimeless::Read,
+    ecs::{system::lifetimeless::Read, query::ROQueryItem},
     math::{Mat4, Vec4},
-    prelude::{default, Component}, render::render_resource::{std430::AsStd430, std140::AsStd140},
+    prelude::{default, Component}, render::render_resource::ShaderType, 
 };
 use bytemuck::{Pod, Zeroable};
 
-use crate::prelude::{GpuMeshInstance, Instance, InstanceColor, MeshInstance, ReadOnlyQueryItem};
+use crate::prelude::{GpuMeshInstance, Instance, InstanceColor, MeshInstance};
 
 #[derive(Debug, Default, Clone, PartialEq, Component)]
 pub struct ColorMeshInstance {
@@ -18,7 +18,7 @@ pub struct ColorMeshInstance {
 }
 
 /// GPU-friendly data for a since mesh instance
-#[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable, AsStd140, AsStd430, Component)]
+#[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable, ShaderType, Component)]
 #[repr(C)]
 pub struct GpuColorMeshInstance {
     pub base: GpuMeshInstance,
@@ -41,7 +41,7 @@ impl Instance for ColorMeshInstance {
     type Query = (<MeshInstance as Instance>::Query, Read<InstanceColor>);
 
     fn extract_instance<'w>(
-        (base, color): ReadOnlyQueryItem<Self::Query>,
+        (base, color): ROQueryItem<Self::Query>,
     ) -> Self::ExtractedInstance {
         ColorMeshInstance {
             base: MeshInstance::extract_instance(base),

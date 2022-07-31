@@ -15,14 +15,17 @@ struct UniformData {
     _: f32;
 };
 
-[[group(0), binding(0)]]
+@group(0)
+@binding(0)
 var<uniform> in_uniform: UniformData;
 
-[[group(0), binding(1)]]
+@group(0)
+@binding(1)
 var<storage, read_write> out_instances: ColorInstances;
 
-[[stage(compute), workgroup_size(64)]]
-fn instances([[builtin(global_invocation_id)]] invocation_id: vec3<u32>) {
+@compute
+@workgroup_size(64)
+fn instances(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
     // Calculate maximum indices
     let max_instance = arrayLength(&out_instances.instances);
 

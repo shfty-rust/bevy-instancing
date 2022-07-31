@@ -2,12 +2,10 @@ use bevy::{
     asset::load_internal_asset,
     prelude::{App, HandleUntyped, Plugin, Shader},
     reflect::TypeUuid,
-    render::{render_component::ExtractComponentPlugin, RenderApp},
+    render::{RenderApp, extract_component::ExtractComponentPlugin},
 };
 
 use crate::prelude::{InstanceBlock, InstancedMeshPipeline};
-
-use bevy::asset as bevy_asset;
 
 pub const INSTANCED_MESH_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 7051817732463169032);

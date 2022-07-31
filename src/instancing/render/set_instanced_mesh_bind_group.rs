@@ -5,10 +5,12 @@ use bevy::{
         lifetimeless::{Read, SQuery, SRes},
         SystemParamItem,
     },
-    prelude::Entity,
-    render::{render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::std140::{AsStd140, Std140}},
+    prelude::{info, Entity},
+    render::{
+        render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
+        render_resource::encase::private::ShaderType,
+    },
 };
-use bytemuck::Pod;
 
 use crate::prelude::{InstanceBatchKey, InstanceViewMeta, SpecializedInstancedMaterial};
 
@@ -22,8 +24,7 @@ pub struct SetInstancedMeshBindGroup<M: SpecializedInstancedMaterial, const I: u
 impl<M: SpecializedInstancedMaterial, const I: usize> EntityRenderCommand
     for SetInstancedMeshBindGroup<M, I>
 where
-    <M::Instance as Instance>::PreparedInstance: AsStd140,
-    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+    <M::Instance as Instance>::PreparedInstance: ShaderType,
 {
     type Param = (SRes<InstanceViewMeta<M>>, SQuery<Read<InstanceBatchKey<M>>>);
     #[inline]
@@ -33,6 +34,12 @@ where
         (instance_view_meta, query_instance_batch_key): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
+        info!(
+            "SetInstancedMeshBindGroup<{}, {}>",
+            std::any::type_name::<M>(),
+            I
+        );
+
         let batched_instances = instance_view_meta
             .into_inner()
             .get(&view)

@@ -4,7 +4,7 @@ pub use crate::{
         instance_block::{instance_block_bundle::*, *},
         material::{
             instanced_material::*, instanced_material_pipeline::*, plugin::*,
-            set_instanced_material_bind_group::*, specialized_instanced_material::*, *,
+            set_instanced_material_bind_group::*, specialized_instanced_material::*, systems::*, *,
         },
         mesh_instance::{mesh_instance_bundle::*, *},
         plugin::*,
@@ -17,9 +17,7 @@ pub use crate::{
     materials::{
         basic_material::{plugin::*, *},
         custom_material::{custom_material::*, plugin::*, *},
-        texture_material::{
-            plugin::*, texture_material::*, *,
-        },
+        texture_material::{plugin::*, texture_material::*, *},
         *,
     },
     *,
