@@ -10,7 +10,7 @@ use bevy::{
     render::{
         render_asset::RenderAssets,
         render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
-    }, prelude::info,
+    }, prelude::debug,
 };
 
 use crate::prelude::SpecializedInstancedMaterial;
@@ -31,7 +31,7 @@ impl<M: SpecializedInstancedMaterial, const I: usize> EntityRenderCommand
         (materials, query): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        info!(
+        debug!(
             "SetInstancedMaterialBindGroup<{}, {}>",
             std::any::type_name::<M>(),
             I

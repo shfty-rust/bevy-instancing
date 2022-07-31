@@ -4,8 +4,6 @@ use bevy::{
     reflect::TypeUuid,
 };
 
-use bevy::asset as bevy_asset;
-
 use crate::prelude::{InstancedMaterialPlugin, TextureMaterial, ColorInstancePlugin};
 
 pub const TEXTURE_SHADER_HANDLE: HandleUntyped =

@@ -1,6 +1,6 @@
 use bevy::{
     pbr::{MeshPipeline, MeshPipelineKey},
-    prelude::{FromWorld, Shader, World, info},
+    prelude::{FromWorld, Shader, World},
     render::{
         mesh::MeshVertexBufferLayout,
         render_resource::{
@@ -78,7 +78,10 @@ impl SpecializedMeshPipeline for InstancedMeshPipeline {
             self.instance_buffer_binding_type,
             BufferBindingType::Storage { .. }
         ) {
-            descriptor.vertex.shader_defs.push(String::from("NO_STORAGE_BUFFERS_SUPPORT"));
+            descriptor
+                .vertex
+                .shader_defs
+                .push(String::from("NO_STORAGE_BUFFERS_SUPPORT"));
         }
 
         descriptor.layout = Some(vec![

@@ -9,7 +9,7 @@ pub use crate::{
         mesh_instance::{mesh_instance_bundle::*, *},
         plugin::*,
         render::{
-            draw_indexed_indirect::*, draw_indirect::*, instance::*, instanced_mesh_pipeline::*,
+            instance::*, instanced_mesh_pipeline::*,
             set_instanced_mesh_bind_group::*, *,
         },
         *,

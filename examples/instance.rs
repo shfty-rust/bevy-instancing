@@ -232,7 +232,7 @@ fn setup_instancing(
         Color::rgba(1.0, 1.0, 1.0, 0.5),
         Color::rgba(1.0, 0.0, 0.0, 0.5),
         Color::rgba(0.0, 1.0, 0.0, 0.5),
-        Color::BLUE,
+        Color::rgba(0.0, 0.0, 1.0, 0.5),
     ];
 
     for (x, mesh) in meshes.into_iter().enumerate() {

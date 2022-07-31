@@ -1,12 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, info, Entity, Handle, Mesh, Query, Res, ResMut, With},
+    prelude::{debug, default, Entity, Handle, Mesh, Query, Res, ResMut, With},
     render::{
         mesh::Indices,
         view::{ExtractedView, VisibleEntities},
     },
 };
+use wgpu::util::{DrawIndexedIndirect, DrawIndirect};
 
 use crate::instancing::{
     instance_block::InstanceBlock,
@@ -17,9 +18,7 @@ use crate::instancing::{
         },
         specialized_instanced_material::SpecializedInstancedMaterial,
     },
-    render::{
-        draw_indexed_indirect::DrawIndexedIndirect, draw_indirect::DrawIndirect, instance::Instance,
-    },
+    render::instance::Instance,
 };
 
 pub fn system<M: SpecializedInstancedMaterial>(
@@ -153,7 +152,7 @@ pub fn system<M: SpecializedInstancedMaterial>(
                                 base_index += index_count;
 
                                 DrawIndirectVariant::Indexed(DrawIndexedIndirect {
-                                    index_count: *index_count,
+                                    vertex_count: *index_count,
                                     ..default()
                                 })
                             }

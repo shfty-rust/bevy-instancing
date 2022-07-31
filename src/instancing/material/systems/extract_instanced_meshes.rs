@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, Assets, Commands, Handle, Mesh, Query, Res, With, info},
+    prelude::{debug, default, Assets, Commands, Handle, Mesh, Query, Res, With},
     render::Extract,
 };
 
@@ -68,4 +68,3 @@ pub fn system<M: SpecializedInstancedMaterial>(
         ..default()
     })
 }
-

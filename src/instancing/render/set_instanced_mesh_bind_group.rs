@@ -5,7 +5,7 @@ use bevy::{
         lifetimeless::{Read, SQuery, SRes},
         SystemParamItem,
     },
-    prelude::{info, Entity},
+    prelude::{debug, Entity},
     render::{
         render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::encase::private::ShaderType,
@@ -34,7 +34,7 @@ where
         (instance_view_meta, query_instance_batch_key): SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        info!(
+        debug!(
             "SetInstancedMeshBindGroup<{}, {}>",
             std::any::type_name::<M>(),
             I

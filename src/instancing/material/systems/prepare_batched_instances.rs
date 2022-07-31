@@ -1,14 +1,17 @@
 use std::collections::BTreeMap;
 
 use bevy::{
-    prelude::{debug, info, Commands, Entity, Handle, Mesh, Query, Res, ResMut, With},
+    prelude::{debug, Commands, Entity, Handle, Mesh, Query, Res, ResMut, With},
     render::{
         mesh::Indices,
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
     },
 };
-use wgpu::{util::BufferInitDescriptor, BindGroupDescriptor, BindGroupEntry, BufferUsages};
+use wgpu::{
+    util::{BufferInitDescriptor, DrawIndexedIndirect, DrawIndirect},
+    BindGroupDescriptor, BindGroupEntry, BufferUsages,
+};
 
 use crate::instancing::{
     instance_block::{InstanceBlock, InstanceBlockBuffer},
@@ -20,9 +23,7 @@ use crate::instancing::{
         },
         specialized_instanced_material::SpecializedInstancedMaterial,
     },
-    render::{
-        draw_indexed_indirect::DrawIndexedIndirect, draw_indirect::DrawIndirect, instance::Instance,
-    },
+    render::instance::Instance,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -42,12 +43,12 @@ pub fn system<M: SpecializedInstancedMaterial>(
     mut query_views: Query<Entity, (With<ExtractedView>, With<VisibleEntities>)>,
     mut commands: Commands,
 ) {
-    info!("{}", std::any::type_name::<M>());
+    debug!("{}", std::any::type_name::<M>());
 
     let render_meshes = &render_meshes.instanced_meshes;
 
     for view_entity in query_views.iter_mut() {
-        info!("\tView {view_entity:?}");
+        debug!("\tView {view_entity:?}");
         let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
 
         // Process batches
@@ -159,8 +160,8 @@ pub fn system<M: SpecializedInstancedMaterial>(
 
                                 let indirect = DrawIndexedIndirect {
                                     instance_count: *instance_count as u32,
-                                    first_index: *index_offset as u32,
-                                    first_instance: *instance_offset as u32,
+                                    base_index: *index_offset as u32,
+                                    base_instance: *instance_offset as u32,
                                     ..*indirect
                                 };
 
@@ -169,9 +170,16 @@ pub fn system<M: SpecializedInstancedMaterial>(
                         )
                         .collect::<Vec<_>>();
 
+                    debug!("Indirect data: {indirect_data:#?}");
+
                     render_device.create_buffer_with_data(&BufferInitDescriptor {
                         label: Some("indirect buffer"),
-                        contents: bytemuck::cast_slice(&indirect_data),
+                        contents: indirect_data
+                            .iter()
+                            .flat_map(|indirect| indirect.as_bytes())
+                            .copied()
+                            .collect::<Vec<_>>()
+                            .as_slice(),
                         usage: BufferUsages::INDIRECT,
                     })
                 }
@@ -196,8 +204,8 @@ pub fn system<M: SpecializedInstancedMaterial>(
 
                                 DrawIndirect {
                                     instance_count: *instance_count as u32,
-                                    first_vertex: *vertex_offset as u32,
-                                    first_instance: *instance_offset as u32,
+                                    base_vertex: *vertex_offset as u32,
+                                    base_instance: *instance_offset as u32,
                                     ..indirect
                                 }
                             },
@@ -206,7 +214,12 @@ pub fn system<M: SpecializedInstancedMaterial>(
 
                     render_device.create_buffer_with_data(&BufferInitDescriptor {
                         label: Some("indirect buffer"),
-                        contents: bytemuck::cast_slice(&indirect_data),
+                        contents: indirect_data
+                            .iter()
+                            .flat_map(|indirect| indirect.as_bytes())
+                            .copied()
+                            .collect::<Vec<_>>()
+                            .as_slice(),
                         usage: BufferUsages::INDIRECT,
                     })
                 }

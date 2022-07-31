@@ -18,6 +18,10 @@ pub fn system<M: SpecializedInstancedMaterial>(
     debug!("{}", std::any::type_name::<M>());
 
     for (view_entity, visible_entities) in query_views.iter() {
+        debug!("View {view_entity:?}");
+
+        debug!("Visible entities: {visible_entities:#?}");
+
         let instance_blocks = visible_entities
             .entities
             .iter()
@@ -25,7 +29,7 @@ pub fn system<M: SpecializedInstancedMaterial>(
             .filter(|entity| query_instance_block.get(*entity).is_ok())
             .collect::<Vec<_>>();
 
-        debug!("View {view_entity:?} instance blocks: {instance_blocks:#?}");
+        debug!("Instance blocks: {instance_blocks:#?}");
 
         instance_view_meta
             .get_mut(&view_entity)

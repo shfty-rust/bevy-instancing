@@ -2,7 +2,7 @@ pub mod instance_block_bundle;
 
 use bevy::{
     ecs::{reflect::ReflectComponent, system::lifetimeless::Read},
-    prelude::Component,
+    prelude::{Component},
     reflect::Reflect,
     render::{extract_component::ExtractComponent, render_resource::Buffer},
 };

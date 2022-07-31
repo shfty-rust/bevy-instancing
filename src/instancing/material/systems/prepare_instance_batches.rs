@@ -118,7 +118,6 @@ pub fn system<M: SpecializedInstancedMaterial>(
         let span = bevy::prelude::info_span!("Batch instance blocks by key");
         let keyed_instance_blocks = span.in_scope(|| {
             // Batch instance blocks by key
-
             let mut keyed_instance_blocks =
                 BTreeMap::<InstanceBatchKey<M>, Vec<(Entity, &Handle<M>, &InstanceBlock)>>::new();
 

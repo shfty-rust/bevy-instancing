@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.8.0", features = [ "dynamic" ] }
+bevy = { version = "0.8.0", features = [
+        #"dynamic"
+]}
 bytemuck = "1.11.0"
-wgpu = "0.13.1"
+wgpu = "*"

@@ -3,16 +3,16 @@
 #import indirect_instancing::color_instance_struct
 
 struct UniformData {
-    time: f32;
-    _: f32;
-    _: f32;
-    _: f32;
-    normal: vec3<f32>;
-    _: f32;
-    tangent: vec3<f32>;
-    _: f32;
-    tint: vec3<f32>;
-    _: f32;
+    time: f32,
+    _: f32,
+    _: f32,
+    _: f32,
+    normal: vec3<f32>,
+    _: f32,
+    tangent: vec3<f32>,
+    _: f32,
+    tint: vec3<f32>,
+    _: f32,
 };
 
 @group(0)

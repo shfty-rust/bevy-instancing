@@ -1,5 +1,5 @@
 use bevy::{
-    prelude::{debug, default, Entity, Query, ResMut, With, info},
+    prelude::{debug, default, Entity, Query, ResMut, With},
     render::view::{ExtractedView, VisibleEntities},
 };
 
@@ -11,10 +11,10 @@ pub fn system<M: SpecializedInstancedMaterial>(
     query_views: Query<Entity, (With<ExtractedView>, With<VisibleEntities>)>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
 ) {
-    info!("{}", std::any::type_name::<M>());
+    debug!("{}", std::any::type_name::<M>());
     instance_view_meta.clear();
     for view_entity in query_views.iter() {
-        info!("\tView {view_entity:?}");
+        debug!("\tView {view_entity:?}");
         instance_view_meta.insert(view_entity, default());
     }
 }

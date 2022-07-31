@@ -1,7 +1,7 @@
 use bevy::{
     core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
     pbr::MeshPipelineKey,
-    prelude::{debug, error, info, Msaa, Query, Res, ResMut},
+    prelude::{debug, error, Msaa, Query, Res, ResMut},
     render::{
         render_phase::{DrawFunctions, RenderPhase},
         render_resource::{PipelineCache, SpecializedMeshPipelines},
@@ -28,10 +28,10 @@ pub fn system<M: SpecializedInstancedMaterial>(
     mut query_alpha_mask_3d: Query<&mut RenderPhase<AlphaMask3d>>,
     mut query_transparent_3d: Query<&mut RenderPhase<Transparent3d>>,
 ) {
-    info!("{}", std::any::type_name::<M>());
+    debug!("{}", std::any::type_name::<M>());
 
     for (view_entity, instance_meta) in instance_view_meta.iter() {
-        info!("\tView {view_entity:?}");
+        debug!("\tView {view_entity:?}");
 
         for (key, batched_instances) in &instance_meta.batched_instances {
             let batch_entity = batched_instances.batch_entity;
@@ -84,7 +84,7 @@ pub fn system<M: SpecializedInstancedMaterial>(
             let distance = 0.0;
             match key.material_key.alpha_mode {
                 GpuAlphaMode::Opaque => {
-                    info!("\t\tQueuing opaque instanced draw {batch_entity:?}");
+                    debug!("\t\tQueuing opaque instanced draw {batch_entity:?}");
                     let mut opaque_phase = query_opaque_3d.get_mut(*view_entity).unwrap();
                     opaque_phase.add(Opaque3d {
                         entity: batch_entity,
@@ -94,7 +94,7 @@ pub fn system<M: SpecializedInstancedMaterial>(
                     });
                 }
                 GpuAlphaMode::Mask => {
-                    info!("\t\tQueuing masked instanced draw {batch_entity:?}");
+                    debug!("\t\tQueuing masked instanced draw {batch_entity:?}");
                     let mut alpha_mask_phase = query_alpha_mask_3d.get_mut(*view_entity).unwrap();
                     alpha_mask_phase.add(AlphaMask3d {
                         entity: batch_entity,
@@ -104,7 +104,7 @@ pub fn system<M: SpecializedInstancedMaterial>(
                     });
                 }
                 GpuAlphaMode::Blend => {
-                    info!("\t\tQueuing transparent instanced draw {batch_entity:?}");
+                    debug!("\t\tQueuing transparent instanced draw {batch_entity:?}");
                     let mut transparent_phase = query_transparent_3d.get_mut(*view_entity).unwrap();
                     transparent_phase.add(Transparent3d {
                         entity: batch_entity,

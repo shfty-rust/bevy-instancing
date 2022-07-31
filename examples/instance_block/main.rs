@@ -10,12 +10,11 @@ use std::marker::PhantomData;
 use std::num::NonZeroU64;
 
 use bevy::ecs::system::lifetimeless::Read;
-use bevy::math::Vec4;
 use bevy::prelude::{
-    info, Camera3dBundle, Color, Component, Entity, FromWorld, Handle, Query, Res, With, World,
+    debug, Camera3dBundle, Component, Entity, FromWorld, Handle, Query, Res, With, World,
 };
 use bevy::reflect::TypeUuid;
-use bevy::render::extract_component::{ExtractComponentPlugin, ExtractComponent};
+use bevy::render::extract_component::{ExtractComponent, ExtractComponentPlugin};
 use bevy::render::render_graph::{Node, NodeLabel, RenderGraph};
 use bevy::render::render_resource::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
@@ -183,15 +182,15 @@ impl Node for InstanceComputeNode {
         render_context: &mut bevy::render::renderer::RenderContext,
         world: &bevy::prelude::World,
     ) -> Result<(), bevy::render::render_graph::NodeRunError> {
-        info!("InstanceComputeNode::run");
+        debug!("InstanceComputeNode::run");
         let pipeline_cache = world.resource::<PipelineCache>();
         let pipeline = world.resource::<InstanceComputePipeline>();
 
         if let Some(instance_pipeline) = pipeline_cache.get_compute_pipeline(pipeline.pipeline) {
-            info!("Instance pipeline valid");
+            debug!("Instance pipeline valid");
             let compute_jobs = &world.resource::<InstanceComputeQueue>().0;
             for compute_job in compute_jobs {
-                info!(
+                debug!(
                     "Running compute job with {} instances",
                     compute_job.instance_count
                 );
@@ -228,7 +227,7 @@ pub fn queue_compute_instances<M: SpecializedInstancedMaterial>(
     >,
     mut commands: Commands,
 ) {
-    info!("queue_compute_instances::<{}>", std::any::type_name::<M>());
+    debug!("queue_compute_instances::<{}>", std::any::type_name::<M>());
     let mut instance_compute_queue = vec![];
 
     for (
@@ -244,7 +243,7 @@ pub fn queue_compute_instances<M: SpecializedInstancedMaterial>(
             usage: BufferUsages::UNIFORM,
         });
 
-        info!("Instance block {instance_block_entity:?}");
+        debug!("Instance block {instance_block_entity:?}");
         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
             label: None,
             layout: &pipeline.bind_group_layout,
@@ -268,7 +267,7 @@ pub fn queue_compute_instances<M: SpecializedInstancedMaterial>(
             ],
         });
 
-        info!(
+        debug!(
             "Queueing board compute job for {} cells",
             instance_block_range.instance_count
         );

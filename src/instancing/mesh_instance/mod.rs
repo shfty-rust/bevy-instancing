@@ -2,7 +2,7 @@ pub mod mesh_instance_bundle;
 
 use bevy::{
     ecs::{query::ROQueryItem, system::lifetimeless::Read},
-    math::{Mat4, Vec3},
+    math::Mat4,
     prelude::{
         default, Commands, Component, ComputedVisibility, Entity, GlobalTransform, Handle, Mesh,
         Query,
