@@ -1,14 +1,6 @@
 #import indirect_instancing::instance_struct
 #import indirect_instancing::indirect_struct
-
-struct BoardInstanceData {
-    base: InstanceData;
-    color: vec4<f32>;
-};
-
-struct BoardInstances {
-    instances: array<BoardInstanceData>;
-};
+#import indirect_instancing::color_instance_struct
 
 struct UniformData {
     time: f32;
@@ -27,7 +19,7 @@ struct UniformData {
 var<uniform> in_uniform: UniformData;
 
 [[group(0), binding(1)]]
-var<storage, read_write> out_instances: BoardInstances;
+var<storage, read_write> out_instances: ColorInstances;
 
 [[stage(compute), workgroup_size(64)]]
 fn instances([[builtin(global_invocation_id)]] invocation_id: vec3<u32>) {

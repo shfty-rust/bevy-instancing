@@ -13,7 +13,7 @@ use bevy::{
     pbr::{AlphaMode, MeshPipelineKey, SetMeshViewBindGroup},
     prelude::{
         debug, default, error, Assets, Commands, Deref, DerefMut, Entity, Handle, Mesh,
-        ParallelSystemDescriptorCoercion, With, GlobalTransform, Transform,
+        ParallelSystemDescriptorCoercion, With,
     },
     render::{
         mesh::{Indices, MeshVertexBufferLayout, PrimitiveTopology},
@@ -23,7 +23,12 @@ use bevy::{
             AddRenderCommand, DrawFunctions, EntityRenderCommand, RenderCommandResult, RenderPhase,
             SetItemPipeline, TrackedRenderPass,
         },
-        render_resource::{IndexFormat, PipelineCache, SpecializedMeshPipelines},
+        render_resource::{
+            std140::{AsStd140, Std140},
+            BindingResource, BufferBindingType, IndexFormat, PipelineCache,
+            SpecializedMeshPipelines, StorageBuffer, UniformVec,
+        },
+        renderer::RenderQueue,
         view::{ExtractedView, Msaa, VisibleEntities},
         RenderApp, RenderStage,
     },
@@ -38,6 +43,7 @@ use bevy::{
         renderer::RenderDevice,
     },
 };
+use bytemuck::Pod;
 
 use crate::prelude::{
     extract_mesh_instances, DrawIndexedIndirect, DrawIndirect, Instance, InstanceBlock,
@@ -60,7 +66,11 @@ impl<M: SpecializedInstancedMaterial> Default for InstancedMaterialPlugin<M> {
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Plugin for InstancedMaterialPlugin<M> {
+impl<M: SpecializedInstancedMaterial> Plugin for InstancedMaterialPlugin<M>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     fn build(&self, app: &mut App) {
         app.add_asset::<M>()
             .add_plugin(ExtractComponentPlugin::<Handle<M>>::default())
@@ -404,19 +414,128 @@ pub struct MeshBatch {
     indirect_data: Vec<DrawIndirectVariant>,
 }
 
-pub struct InstanceBatch<M: SpecializedInstancedMaterial> {
+pub const MAX_UNIFORM_BUFFER_INSTANCES: usize = 112;
+
+pub enum GpuInstances<M: SpecializedInstancedMaterial>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
+    Uniform {
+        buffer:
+            UniformVec<[<M::Instance as Instance>::PreparedInstance; MAX_UNIFORM_BUFFER_INSTANCES]>,
+    },
+    Storage {
+        buffer: StorageBuffer<<M::Instance as Instance>::PreparedInstance>,
+    },
+}
+
+impl<M: SpecializedInstancedMaterial> GpuInstances<M>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
+    fn new(buffer_binding_type: BufferBindingType) -> Self {
+        match buffer_binding_type {
+            BufferBindingType::Storage { .. } => Self::storage(),
+            BufferBindingType::Uniform => Self::uniform(),
+        }
+    }
+
+    fn uniform() -> Self {
+        Self::Uniform {
+            buffer: UniformVec::default(),
+        }
+    }
+
+    fn storage() -> Self {
+        Self::Storage {
+            buffer: StorageBuffer::default(),
+        }
+    }
+
+    fn clear(&mut self) {
+        match self {
+            Self::Uniform { buffer } => buffer.clear(),
+            Self::Storage { buffer } => buffer.clear(),
+        }
+    }
+
+    fn buffer(&self) -> Option<&Buffer> {
+        match self {
+            Self::Uniform { buffer } => buffer.uniform_buffer(),
+            Self::Storage { buffer } => buffer.buffer(),
+        }
+    }
+
+    fn push(&mut self, mut instances: Vec<<M::Instance as Instance>::PreparedInstance>) {
+        match self {
+            Self::Uniform { buffer } => {
+                // NOTE: This iterator construction allows moving and padding with default
+                // values and is like this to avoid unnecessary cloning.
+                let gpu_instances = instances
+                    .drain(..)
+                    .chain(std::iter::repeat_with(default))
+                    .take(MAX_UNIFORM_BUFFER_INSTANCES)
+                    .collect::<Vec<_>>();
+                buffer.push(gpu_instances.try_into().unwrap());
+            }
+            Self::Storage { buffer } => {
+                buffer.append(&mut instances);
+            }
+        }
+    }
+
+    fn write_buffer(&mut self, render_device: &RenderDevice, render_queue: &RenderQueue) {
+        match self {
+            Self::Uniform { buffer } => buffer.write_buffer(render_device, render_queue),
+            Self::Storage { buffer } => buffer.write_buffer(render_device, render_queue),
+        }
+    }
+
+    pub fn binding(&self) -> Option<BindingResource> {
+        match self {
+            Self::Uniform { buffer } => buffer.binding(),
+            Self::Storage { buffer } => buffer.binding(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Uniform { buffer } => buffer.len(),
+            Self::Storage { buffer } => buffer.values().len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+pub struct InstanceBatch<M: SpecializedInstancedMaterial>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     pub instances: BTreeSet<Entity>,
     pub instance_block_ranges: BTreeMap<Entity, InstanceBlockRange>,
-    pub instance_buffer_data:
-        Vec<<<M as SpecializedInstancedMaterial>::Instance as Instance>::PreparedInstance>,
+    pub instance_buffer_data: GpuInstances<M>,
 }
 
 #[derive(Deref, DerefMut)]
-pub struct InstanceViewMeta<M: SpecializedInstancedMaterial> {
+pub struct InstanceViewMeta<M: SpecializedInstancedMaterial>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     pub view_meta: BTreeMap<Entity, InstanceMeta<M>>,
 }
 
-impl<M: SpecializedInstancedMaterial> Default for InstanceViewMeta<M> {
+impl<M: SpecializedInstancedMaterial> Default for InstanceViewMeta<M>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     fn default() -> Self {
         Self {
             view_meta: default(),
@@ -439,7 +558,11 @@ impl<M: SpecializedInstancedMaterial> std::fmt::Debug for MaterialBatch<M> {
 }
 
 /// Resource containing instance batches
-pub struct InstanceMeta<M: SpecializedInstancedMaterial> {
+pub struct InstanceMeta<M: SpecializedInstancedMaterial>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     pub instances: Vec<Entity>,
     pub instance_blocks: Vec<Entity>,
     pub mesh_batches: BTreeMap<InstancedMeshKey, MeshBatch>,
@@ -448,7 +571,11 @@ pub struct InstanceMeta<M: SpecializedInstancedMaterial> {
     pub batched_instances: BTreeMap<InstanceBatchKey<M>, BatchedInstances>,
 }
 
-impl<M: SpecializedInstancedMaterial> Default for InstanceMeta<M> {
+impl<M: SpecializedInstancedMaterial> Default for InstanceMeta<M>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     fn default() -> Self {
         Self {
             instances: default(),
@@ -477,7 +604,10 @@ pub struct BatchedInstances {
 pub fn prepare_instanced_view_meta<M: SpecializedInstancedMaterial>(
     query_views: Query<Entity, With<VisibleEntities>>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
-) {
+) where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     instance_view_meta.clear();
     for view_entity in query_views.iter() {
         instance_view_meta.insert(view_entity, default());
@@ -494,7 +624,10 @@ pub fn prepare_view_instances<M: SpecializedInstancedMaterial>(
         ),
     >,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
-) {
+) where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     debug!("prepare_view_instances<{}>", std::any::type_name::<M>());
 
     for (view_entity, visible_entities) in query_views.iter() {
@@ -512,7 +645,10 @@ pub fn prepare_view_instance_blocks<M: SpecializedInstancedMaterial>(
     query_views: Query<(Entity, &VisibleEntities)>,
     query_instance_block: Query<Entity, (With<Handle<M>>, With<InstanceBlock>)>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
-) {
+) where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     debug!(
         "prepare_view_instance_blocks<{}>",
         std::any::type_name::<M>()
@@ -546,7 +682,10 @@ pub fn prepare_mesh_batches<M: SpecializedInstancedMaterial>(
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
     query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
-) {
+) where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     debug!("prepare_mesh_batches<{}>", std::any::type_name::<M>());
 
     let render_meshes = &render_meshes.instanced_meshes;
@@ -705,6 +844,7 @@ pub fn prepare_mesh_batches<M: SpecializedInstancedMaterial>(
 
 pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
+    render_device: Res<RenderDevice>,
     render_meshes: Res<GpuInstancedMeshes<M>>,
     render_materials: Res<RenderAssets<M>>,
     mut query_views: Query<(Entity, &ExtractedView)>,
@@ -715,7 +855,10 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
     query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
-) {
+) where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     debug!("prepare_instance_batches<{}>", std::any::type_name::<M>());
 
     let render_meshes = &render_meshes.instanced_meshes;
@@ -839,8 +982,12 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
 
         // Create an instance buffer vec for each key
         let mut keyed_instance_buffer_data =
-            BTreeMap::<InstanceBatchKey<M>, Vec<<M::Instance as Instance>::PreparedInstance>>::new(
-            );
+            BTreeMap::<InstanceBatchKey<M>, GpuInstances<M>>::new();
+
+        let gpu_instances = || match render_device.get_supported_read_only_binding_type(1) {
+            BufferBindingType::Storage { .. } => GpuInstances::<M>::Storage { buffer: default() },
+            BufferBindingType::Uniform { .. } => GpuInstances::<M>::Uniform { buffer: default() },
+        };
 
         let span = bevy::prelude::info_span!("Populate instances");
         span.in_scope(|| {
@@ -862,8 +1009,8 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
 
                 keyed_instance_buffer_data
                     .entry(key.clone())
-                    .or_default()
-                    .extend(instance_buffer_data);
+                    .or_insert_with(gpu_instances)
+                    .push(instance_buffer_data.collect::<Vec<_>>());
             }
         });
 
@@ -875,7 +1022,7 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
                 .map(|(key, instance_blocks)| {
                     let instance_buffer_data_len = keyed_instance_buffer_data
                         .get(&key)
-                        .map(Vec::len)
+                        .map(GpuInstances::len)
                         .unwrap_or_default();
 
                     // Collect CPU instance block data
@@ -912,8 +1059,10 @@ pub fn prepare_instance_batches<M: SpecializedInstancedMaterial>(
                     .map(|(_, _, instance_block)| instance_block.instance_count)
                     .sum();
 
-                let entry = keyed_instance_buffer_data.entry(key.clone()).or_default();
-                entry.resize(entry.len() + instance_count, default());
+                let entry = keyed_instance_buffer_data
+                    .entry(key.clone())
+                    .or_insert_with(gpu_instances);
+                entry.push((0..instance_count).map(|_| default()).collect::<Vec<_>>());
             }
         });
 
@@ -961,7 +1110,10 @@ pub fn prepare_material_batches<M: SpecializedInstancedMaterial>(
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
     query_instance_block: Query<(Entity, &Handle<M>, &InstanceBlock)>,
-) {
+) where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     debug!(
         "prepare_instanced_material_batches<{}>",
         std::any::type_name::<M>()
@@ -1014,6 +1166,7 @@ pub fn prepare_batched_instances<M: SpecializedInstancedMaterial>(
     render_meshes: Res<GpuInstancedMeshes<M>>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
     render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
     query_instance: Query<(
         Entity,
         &Handle<M>,
@@ -1023,7 +1176,10 @@ pub fn prepare_batched_instances<M: SpecializedInstancedMaterial>(
     query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
     mut query_views: Query<Entity, With<ExtractedView>>,
     mut commands: Commands,
-) {
+) where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     debug!(
         "prepare_instanced_materials<{}>",
         std::any::type_name::<M>()
@@ -1037,7 +1193,7 @@ pub fn prepare_batched_instances<M: SpecializedInstancedMaterial>(
 
         // Process batches
         let mut batched_instances = BTreeMap::<InstanceBatchKey<M>, BatchedInstances>::new();
-        for (key, instance_batch) in &instance_meta.instance_batches {
+        for (key, instance_batch) in &mut instance_meta.instance_batches {
             // Fetch data
             let MeshBatch {
                 meshes,
@@ -1197,12 +1353,6 @@ pub fn prepare_batched_instances<M: SpecializedInstancedMaterial>(
                 }
             };
 
-            let instance_buffer = render_device.create_buffer_with_data(&BufferInitDescriptor {
-                label: Some("instance buffer"),
-                contents: bytemuck::cast_slice(&instance_batch.instance_buffer_data),
-                usage: BufferUsages::STORAGE,
-            });
-
             let indirect_indices = mesh_instance_counts
                 .iter()
                 .enumerate()
@@ -1211,6 +1361,10 @@ pub fn prepare_batched_instances<M: SpecializedInstancedMaterial>(
 
             debug!("Indirect indices: {indirect_indices:#?}");
 
+            instance_batch
+                .instance_buffer_data
+                .write_buffer(&render_device, &render_queue);
+
             let instance_bind_group = render_device.create_bind_group(&BindGroupDescriptor {
                 label: Some("instance bind group"),
                 layout: &instanced_material_pipeline
@@ -1218,23 +1372,21 @@ pub fn prepare_batched_instances<M: SpecializedInstancedMaterial>(
                     .bind_group_layout,
                 entries: &[BindGroupEntry {
                     binding: 0,
-                    resource: instance_buffer.as_entire_binding(),
+                    resource: instance_batch.instance_buffer_data.binding().unwrap(),
                 }],
             });
 
             // Insert instance block data
-            for (entity, block_range) in instance_meta
-                .instance_batches
-                .get(key)
-                .unwrap()
-                .instance_block_ranges
-                .iter()
-            {
+            for (entity, block_range) in instance_batch.instance_block_ranges.iter() {
                 commands
                     .entity(*entity)
                     .insert(*block_range)
                     .insert(InstanceBlockBuffer {
-                        buffer: instance_buffer.clone(),
+                        buffer: instance_batch
+                            .instance_buffer_data
+                            .buffer()
+                            .cloned()
+                            .unwrap(),
                     });
             }
 
@@ -1285,7 +1437,10 @@ pub fn queue_instanced_materials<M: SpecializedInstancedMaterial>(
     mut query_opaque_3d: Query<&mut RenderPhase<Opaque3d>>,
     mut query_alpha_mask_3d: Query<&mut RenderPhase<AlphaMask3d>>,
     mut query_transparent_3d: Query<&mut RenderPhase<Transparent3d>>,
-) {
+) where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
     debug!("queue_instanced_materials<{}>", std::any::type_name::<M>());
 
     for (view_entity, instance_meta) in instance_view_meta.iter() {
@@ -1386,13 +1541,25 @@ pub type DrawInstanced<M> = (
 /// Render command for drawing instanced meshes
 pub struct DrawBatchedInstances<M: SpecializedInstancedMaterial>(PhantomData<M>);
 
-impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstances<M> {
-    type Param = (SRes<InstanceViewMeta<M>>, SQuery<Read<InstanceBatchKey<M>>>);
+impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstances<M>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
+{
+    type Param = (
+        SRes<RenderDevice>,
+        SRes<InstanceViewMeta<M>>,
+        SQuery<Read<InstanceBatchKey<M>>>,
+    );
     #[inline]
     fn render<'w>(
         view: Entity,
         item: Entity,
-        (instance_meta, query_instance_batch_key): SystemParamItem<'w, '_, Self::Param>,
+        (render_device, instance_meta, query_instance_batch_key): SystemParamItem<
+            'w,
+            '_,
+            Self::Param,
+        >,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
         debug!("DrawInstanceBatch {item:?}");
@@ -1410,12 +1577,14 @@ impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstanc
             Some((index_buffer, index_format)) => {
                 pass.set_index_buffer(index_buffer.slice(..), 0, *index_format);
 
-                for i in &batched_instances.indirect_indices {
-                    debug!("Drawing indexed indirect {i:?}");
-                    pass.draw_indexed_indirect(
-                        &batched_instances.indirect_buffer,
-                        (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
-                    );
+                if render_device.features().contains(wgpu::Features::INDIRECT_FIRST_INSTANCE) {
+                    for i in &batched_instances.indirect_indices {
+                        debug!("Drawing indexed indirect {i:?}");
+                        pass.draw_indexed_indirect(
+                            &batched_instances.indirect_buffer,
+                            (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
+                        );
+                    }
                 }
             }
             None => {

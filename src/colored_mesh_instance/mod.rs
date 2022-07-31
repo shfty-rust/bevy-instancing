@@ -5,7 +5,7 @@ pub mod plugin;
 use bevy::{
     ecs::system::lifetimeless::Read,
     math::{Mat4, Vec4},
-    prelude::{default, Component},
+    prelude::{default, Component}, render::render_resource::{std430::AsStd430, std140::AsStd140},
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -18,7 +18,7 @@ pub struct ColorMeshInstance {
 }
 
 /// GPU-friendly data for a since mesh instance
-#[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable, Component)]
+#[derive(Debug, Copy, Clone, PartialEq, Pod, Zeroable, AsStd140, AsStd430, Component)]
 #[repr(C)]
 pub struct GpuColorMeshInstance {
     pub base: GpuMeshInstance,

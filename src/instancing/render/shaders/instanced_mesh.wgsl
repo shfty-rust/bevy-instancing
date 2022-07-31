@@ -2,8 +2,13 @@
 #import bevy_pbr::mesh_struct
 #import indirect_instancing::instance_struct
 
+#ifdef NO_STORAGE_BUFFERS_SUPPORT
+[[group(2), binding(0)]]
+var<uniform> instances: Instances;
+#else
 [[group(2), binding(0)]]
 var<storage> instances: Instances;
+#endif
 
 struct Vertex {
     [[builtin(instance_index)]] instance: u32;

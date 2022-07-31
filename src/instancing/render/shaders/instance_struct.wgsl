@@ -10,7 +10,13 @@ struct InstanceData {
 };
 
 
+#ifdef NO_STORAGE_BUFFERS_SUPPORT
+struct Instances {
+    instances: array<InstanceData, 112>;
+};
+#else
 struct Instances {
     instances: array<InstanceData>;
 };
+#endif
 

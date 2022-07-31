@@ -6,8 +6,13 @@ struct ColorInstanceData {
     color: vec4<f32>;
 };
 
-
+#ifdef NO_STORAGE_BUFFERS_SUPPORT
+struct ColorInstances {
+    instances: array<ColorInstanceData, 112>;
+};
+#else
 struct ColorInstances {
     instances: array<ColorInstanceData>;
 };
+#endif
 

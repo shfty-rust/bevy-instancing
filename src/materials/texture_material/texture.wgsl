@@ -9,8 +9,13 @@ var in_texture: texture_2d<f32>;
 [[group(1), binding(1)]]
 var in_sampler: sampler;
 
+#ifdef NO_STORAGE_BUFFERS_SUPPORT
+[[group(2), binding(0)]]
+var<uniform> in_instances: ColorInstances;
+#else
 [[group(2), binding(0)]]
 var<storage> in_instances: ColorInstances;
+#endif
 
 struct VertexInput {
     [[builtin(instance_index)]] instance: u32;

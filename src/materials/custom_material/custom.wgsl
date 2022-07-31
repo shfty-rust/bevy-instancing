@@ -2,8 +2,13 @@
 #import bevy_pbr::mesh_struct
 #import indirect_instancing::color_instance_struct
 
+#ifdef NO_STORAGE_BUFFERS_SUPPORT
+[[group(2), binding(0)]]
+var<uniform> instances: ColorInstances;
+#else
 [[group(2), binding(0)]]
 var<storage> instances: ColorInstances;
+#endif
 
 struct VertexInput {
     [[builtin(instance_index)]] instance: u32;

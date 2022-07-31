@@ -4,8 +4,10 @@ use bevy::{
     ecs::system::lifetimeless::Read,
     math::{Mat4, Vec3},
     prelude::{
-        default, Component, ComputedVisibility, Entity, GlobalTransform, Handle, Mesh, Query, Commands,
+        default, Commands, Component, ComputedVisibility, Entity, GlobalTransform, Handle, Mesh,
+        Query,
     },
+    render::render_resource::{std140::AsStd140, std430::AsStd430},
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -19,7 +21,7 @@ pub struct MeshInstance {
     pub transform: Mat4,
 }
 
-#[derive(Debug, Copy, Clone, Pod, Zeroable, Component)]
+#[derive(Debug, Copy, Clone, Pod, Zeroable, AsStd140, AsStd430, Component)]
 #[repr(C)]
 pub struct GpuMeshInstance {
     pub mesh: u32,

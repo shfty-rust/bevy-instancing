@@ -6,10 +6,13 @@ use bevy::{
         SystemParamItem,
     },
     prelude::Entity,
-    render::render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
+    render::{render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass}, render_resource::std140::{AsStd140, Std140}},
 };
+use bytemuck::Pod;
 
 use crate::prelude::{InstanceBatchKey, InstanceViewMeta, SpecializedInstancedMaterial};
+
+use super::instance::Instance;
 
 /// Render command for drawing instanced meshes
 pub struct SetInstancedMeshBindGroup<M: SpecializedInstancedMaterial, const I: usize>(
@@ -18,6 +21,9 @@ pub struct SetInstancedMeshBindGroup<M: SpecializedInstancedMaterial, const I: u
 
 impl<M: SpecializedInstancedMaterial, const I: usize> EntityRenderCommand
     for SetInstancedMeshBindGroup<M, I>
+where
+    <M::Instance as Instance>::PreparedInstance: AsStd140,
+    <<<M::Instance as Instance>::PreparedInstance as AsStd140>::Output as Std140>::Padded: Pod,
 {
     type Param = (SRes<InstanceViewMeta<M>>, SQuery<Read<InstanceBatchKey<M>>>);
     #[inline]
