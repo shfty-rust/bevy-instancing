@@ -9,3 +9,7 @@ bevy = { version = "0.8.0", features = [
 ]}
 bytemuck = "1.11.0"
 wgpu = "*"
+
+[[example]]
+name = "instance_compute"
+path = "examples/instance_slice/instance_compute.rs"

@@ -635,7 +635,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                             .indexed_indirects()
                             .unwrap()[*i];
 
-                        info!("Drawing indexed indirect {i:?}: {indirect:#?}");
+                        debug!("Drawing indexed indirect {i:?}: {indirect:#?}");
 
                         pass.draw_indexed_indirect(
                             batched_instances.indirect_buffer.buffer().unwrap(),
@@ -649,7 +649,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                             .indexed_indirects()
                             .unwrap()[*i];
 
-                        info!("Drawing direct {i:?}: {indirect:#?}");
+                        debug!("Drawing direct {i:?}: {indirect:#?}");
 
                         let DrawIndexedIndirect {
                             vertex_count,

@@ -3,6 +3,7 @@ pub use crate::{
     instancing::{
         indirect::*,
         instance_slice::{instance_slice_bundle::*, *},
+        instance_compute::*,
         material::{
             instanced_material_pipeline::*, plugin::*,
             set_instanced_material_bind_group::*, material_instanced::*, systems::*, *,

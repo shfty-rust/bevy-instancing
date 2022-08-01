@@ -3,24 +3,22 @@
 #import indirect_instancing::color_instance_struct
 
 struct UniformData {
+    @size(16)
     time: f32,
-    _: f32,
-    _: f32,
-    _: f32,
+    @size(16)
     normal: vec3<f32>,
-    _: f32,
+    @size(16)
     tangent: vec3<f32>,
-    _: f32,
+    @size(16)
     tint: vec3<f32>,
-    _: f32,
 };
 
 @group(0)
 @binding(0)
 var<uniform> in_uniform: UniformData;
 
-@group(0)
-@binding(1)
+@group(1)
+@binding(0)
 var<storage, read_write> out_instances: ColorInstances;
 
 @compute
