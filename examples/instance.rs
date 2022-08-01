@@ -11,6 +11,7 @@ use bevy::{
     render::{
         camera::{Projection, RenderTarget},
         render_resource::Face,
+        settings::WgpuSettings,
     },
     window::{CreateWindow, PresentMode, WindowDescriptor, WindowId},
     DefaultPlugins,
@@ -20,12 +21,22 @@ use bevy_instancing::prelude::{
     BasicMaterial, BasicMaterialPlugin, ColorInstanceBundle, CustomMaterial, CustomMaterialPlugin,
     IndirectRenderingPlugin, MeshInstanceBundle, TextureMaterial, TextureMaterialPlugin,
 };
+use wgpu::{Limits, Features};
 
 const USE_SECOND_CAMERA: bool = false;
 
 // Test indirect rendering
 fn main() {
     let mut app = App::default();
+
+    app.insert_resource(WgpuSettings {
+        disabled_features: Some(Features::INDIRECT_FIRST_INSTANCE),
+        constrained_limits: Some(Limits {
+            max_storage_buffers_per_shader_stage: 0,
+            ..default()
+        }),
+        ..default()
+    });
 
     app.add_plugins(DefaultPlugins)
         .add_plugin(IndirectRenderingPlugin)

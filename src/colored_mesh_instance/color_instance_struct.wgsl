@@ -2,7 +2,9 @@
 #define_import_path indirect_instancing::color_instance_struct
 
 struct ColorInstanceData {
+    @size(144) @align(16)
     base: InstanceData,
+    @size(16) @align(16)
     color: vec4<f32>,
 };
 

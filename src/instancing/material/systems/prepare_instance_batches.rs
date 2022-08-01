@@ -161,10 +161,8 @@ pub fn system<M: SpecializedInstancedMaterial>(
         let mut keyed_instance_buffer_data =
             BTreeMap::<InstanceBatchKey<M>, GpuInstances<M>>::new();
 
-        let gpu_instances = || match render_device.get_supported_read_only_binding_type(1) {
-            BufferBindingType::Storage { .. } => GpuInstances::<M>::Storage { buffer: default() },
-            BufferBindingType::Uniform { .. } => GpuInstances::<M>::Uniform { buffer: default() },
-        };
+        let gpu_instances =
+            || GpuInstances::new(render_device.get_supported_read_only_binding_type(1));
 
         let span = bevy::prelude::info_span!("Populate instances");
         span.in_scope(|| {

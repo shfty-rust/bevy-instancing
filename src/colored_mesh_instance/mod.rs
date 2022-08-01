@@ -19,7 +19,11 @@ pub struct ColorMeshInstance {
 #[derive(Debug, Copy, Clone, PartialEq, ShaderType, Component)]
 #[repr(C)]
 pub struct GpuColorMeshInstance {
+    #[size(144)]
+    #[align(16)]
     pub base: GpuMeshInstance,
+    #[size(16)]
+    #[align(16)]
     pub color: Vec4,
 }
 

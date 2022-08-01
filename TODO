@@ -1,17 +1,3 @@
-TODO: Uniform support for instance buffer
-      * Need to split instances into
-        (std::mem::size_of::<InstanceData>() / MAX_UNIFORM_BUFFER_SIZE) sub-batches,
-        introduce additional draw calls
-
-TODO: Account for various permutations of indexed / indirect functionality
-      * INDIRECT_EXECUTION and INDIRECT_FIRST_INSTANCE define how the API should be used
-        * If both are present
-          * Issue draw_indirect / draw_indexed_indirect with first_instance offset
-        * If only INDIRECT_EXECUTION is present
-          * Issue draw_indirect / draw_indexed_indirect against separate instance buffers
-        * If neither are present
-          * Submit draw / draw_indexed calls manually
-
 TODO: Optimization pass for instanced mesh batcher
 
 TODO: Use BufferVec to cache batch data inside InstanceMeta

@@ -447,7 +447,7 @@ impl<M: SpecializedInstancedMaterial> GpuInstances<M> {
 
     pub fn len(&self) -> usize {
         match self {
-            Self::Uniform { buffer } => buffer.len(),
+            Self::Uniform { buffer } => buffer.len() * MAX_UNIFORM_BUFFER_INSTANCES,
             Self::Storage { buffer } => buffer.get().len(),
         }
     }
@@ -461,6 +461,15 @@ pub struct InstanceBatch<M: SpecializedInstancedMaterial> {
     pub instances: BTreeSet<Entity>,
     pub instance_block_ranges: BTreeMap<Entity, InstanceBlockRange>,
     pub instance_buffer_data: GpuInstances<M>,
+}
+
+impl<M: SpecializedInstancedMaterial> std::fmt::Debug for InstanceBatch<M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("InstanceBatch")
+            .field("instances", &self.instances)
+            .field("instance_block_ranges", &self.instance_block_ranges)
+            .finish()
+    }
 }
 
 #[derive(Deref, DerefMut)]
@@ -627,7 +636,7 @@ impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstanc
                             .indexed_indirects()
                             .unwrap()[*i];
 
-                        info!("Drawing indexed direct {i:?}: {indirect:#?}");
+                        info!("Drawing direct {i:?}: {indirect:#?}");
 
                         let DrawIndexedIndirect {
                             vertex_count,
@@ -638,7 +647,7 @@ impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstanc
                         } = indirect;
 
                         pass.draw_indexed(
-                            base_index..(base_index + vertex_count),
+                            base_index..base_index + vertex_count,
                             vertex_offset,
                             base_instance..base_instance + instance_count,
                         );
@@ -672,8 +681,8 @@ impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstanc
                         } = indirect;
 
                         pass.draw(
-                            base_vertex..(base_vertex + vertex_count),
-                            base_instance..(base_instance + instance_count),
+                            base_vertex..base_vertex + vertex_count,
+                            base_instance..base_instance + instance_count,
                         );
                     }
                 }
