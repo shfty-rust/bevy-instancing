@@ -12,24 +12,26 @@ use bevy::{
     },
     pbr::{AlphaMode, SetMeshViewBindGroup},
     prelude::{
-        debug, default, info, Deref, DerefMut, Entity, Handle, Mesh,
-        ParallelSystemDescriptorCoercion,
+        debug, default, info, AssetEvent, Assets, Commands, Deref, DerefMut, Entity, EventReader,
+        Handle, Image, Local, Mesh, ParallelSystemDescriptorCoercion, Res, ResMut,
     },
     render::{
         extract_component::ExtractComponentPlugin,
         mesh::{Indices, MeshVertexBufferLayout, PrimitiveTopology},
-        render_asset::{PrepareAssetLabel, RenderAssetPlugin},
+        render_asset::{PrepareAssetLabel, RenderAssets},
         render_phase::{
             AddRenderCommand, EntityRenderCommand, RenderCommandResult, SetItemPipeline,
             TrackedRenderPass,
         },
         render_resource::{
-            BindingResource, BufferBindingType, BufferVec, DynamicUniformBuffer, IndexFormat,
-            ShaderType, SpecializedMeshPipelines, StorageBuffer,
+            AsBindGroupError, BindingResource, BufferBindingType, BufferVec, DynamicUniformBuffer,
+            IndexFormat, OwnedBindingResource, ShaderType, SpecializedMeshPipelines, StorageBuffer,
         },
         renderer::RenderQueue,
-        RenderApp, RenderStage,
+        texture::FallbackImage,
+        Extract, RenderApp, RenderStage,
     },
+    utils::{HashMap, HashSet},
 };
 use bevy::{
     prelude::Component,
@@ -41,10 +43,14 @@ use bevy::{
 
 use crate::prelude::{
     extract_mesh_instances, Instance, InstanceBlockRange, InstancedMaterialPipeline,
-    SetInstancedMaterialBindGroup, SetInstancedMeshBindGroup, SpecializedInstancedMaterial,
+    MaterialInstanced, SetInstancedMaterialBindGroup, SetInstancedMeshBindGroup,
 };
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
+    hash::Hash,
+};
 
 use std::marker::PhantomData;
 
@@ -56,23 +62,23 @@ use super::systems::{
 
 /// Adds the necessary ECS resources and render logic to enable rendering entities using the given [`SpecializedMaterial`]
 /// asset type (which includes [`Material`] types).
-pub struct InstancedMaterialPlugin<M: SpecializedInstancedMaterial>(PhantomData<M>);
+pub struct InstancedMaterialPlugin<M: MaterialInstanced>(PhantomData<M>);
 
-impl<M: SpecializedInstancedMaterial> Default for InstancedMaterialPlugin<M> {
+impl<M: MaterialInstanced> Default for InstancedMaterialPlugin<M> {
     fn default() -> Self {
         Self(default())
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Plugin for InstancedMaterialPlugin<M>
+impl<M: MaterialInstanced> Plugin for InstancedMaterialPlugin<M>
 where
+    M::Data: Debug + Clone + Hash + PartialEq + Eq,
     <M::Instance as Instance>::PreparedInstance: ShaderType,
 {
     fn build(&self, app: &mut App) {
         app.add_asset::<M>()
             .add_plugin(ExtractComponentPlugin::<Handle<M>>::default())
-            .add_plugin(ExtractComponentPlugin::<Handle<Mesh>>::default())
-            .add_plugin(RenderAssetPlugin::<M>::default());
+            .add_plugin(ExtractComponentPlugin::<Handle<Mesh>>::default());
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
@@ -81,9 +87,13 @@ where
                 .add_render_command::<AlphaMask3d, DrawInstanced<M>>()
                 .init_resource::<InstanceViewMeta<M>>()
                 .init_resource::<InstancedMaterialPipeline<M>>()
+                .init_resource::<ExtractedMaterials<M>>()
+                .init_resource::<RenderMaterials<M>>()
                 .init_resource::<SpecializedMeshPipelines<InstancedMaterialPipeline<M>>>()
+                .add_system_to_stage(RenderStage::Extract, extract_materials::<M>)
                 .add_system_to_stage(RenderStage::Extract, extract_mesh_instances::<M>)
                 .add_system_to_stage(RenderStage::Extract, extract_instanced_meshes::system::<M>)
+                .add_system_to_stage(RenderStage::Prepare, prepare_materials::<M>)
                 .add_system_to_stage(
                     RenderStage::Prepare,
                     prepare_instanced_view_meta::system::<M>
@@ -179,12 +189,12 @@ pub enum GpuIndexBufferData {
 }
 
 #[derive(Debug, Clone)]
-pub struct GpuInstancedMeshes<M: SpecializedInstancedMaterial> {
+pub struct GpuInstancedMeshes<M: MaterialInstanced> {
     pub instanced_meshes: BTreeMap<Handle<Mesh>, GpuInstancedMesh>,
     pub _phantom: PhantomData<M>,
 }
 
-impl<M: SpecializedInstancedMaterial> Default for GpuInstancedMeshes<M> {
+impl<M: MaterialInstanced> Default for GpuInstancedMeshes<M> {
     fn default() -> Self {
         GpuInstancedMeshes {
             instanced_meshes: default(),
@@ -227,12 +237,12 @@ impl From<AlphaMode> for GpuAlphaMode {
 }
 
 /// Unique key describing a set of mutually incompatible materials
-pub struct InstancedMaterialBatchKey<M: SpecializedInstancedMaterial> {
+pub struct InstancedMaterialBatchKey<M: MaterialInstanced> {
     pub alpha_mode: GpuAlphaMode,
     pub key: M::BatchKey,
 }
 
-impl<M: SpecializedInstancedMaterial> Clone for InstancedMaterialBatchKey<M> {
+impl<M: MaterialInstanced> Clone for InstancedMaterialBatchKey<M> {
     fn clone(&self) -> Self {
         Self {
             alpha_mode: self.alpha_mode.clone(),
@@ -241,15 +251,15 @@ impl<M: SpecializedInstancedMaterial> Clone for InstancedMaterialBatchKey<M> {
     }
 }
 
-impl<M: SpecializedInstancedMaterial> PartialEq for InstancedMaterialBatchKey<M> {
+impl<M: MaterialInstanced> PartialEq for InstancedMaterialBatchKey<M> {
     fn eq(&self, other: &Self) -> bool {
         self.alpha_mode == other.alpha_mode && self.key == other.key
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Eq for InstancedMaterialBatchKey<M> {}
+impl<M: MaterialInstanced> Eq for InstancedMaterialBatchKey<M> {}
 
-impl<M: SpecializedInstancedMaterial> PartialOrd for InstancedMaterialBatchKey<M>
+impl<M: MaterialInstanced> PartialOrd for InstancedMaterialBatchKey<M>
 where
     M::BatchKey: PartialOrd,
 {
@@ -262,7 +272,7 @@ where
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Ord for InstancedMaterialBatchKey<M>
+impl<M: MaterialInstanced> Ord for InstancedMaterialBatchKey<M>
 where
     M::BatchKey: Ord,
 {
@@ -275,9 +285,9 @@ where
     }
 }
 
-impl<M: SpecializedInstancedMaterial> std::fmt::Debug for InstancedMaterialBatchKey<M>
+impl<M: MaterialInstanced> Debug for InstancedMaterialBatchKey<M>
 where
-    M::BatchKey: std::fmt::Debug,
+    M::BatchKey: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InstancedMaterialKey")
@@ -288,18 +298,18 @@ where
 }
 
 /// Unique key describing a set of mutually incompatible instances
-pub struct InstanceBatchKey<M: SpecializedInstancedMaterial> {
+pub struct InstanceBatchKey<M: MaterialInstanced> {
     pub mesh_key: InstancedMeshKey,
     pub material_key: InstancedMaterialBatchKey<M>,
 }
 
-impl<M: SpecializedInstancedMaterial> Component for InstanceBatchKey<M> {
+impl<M: MaterialInstanced> Component for InstanceBatchKey<M> {
     type Storage = TableStorage;
 }
 
 impl<M> Clone for InstanceBatchKey<M>
 where
-    M: SpecializedInstancedMaterial,
+    M: MaterialInstanced,
 {
     fn clone(&self) -> Self {
         Self {
@@ -309,15 +319,15 @@ where
     }
 }
 
-impl<M: SpecializedInstancedMaterial> PartialEq for InstanceBatchKey<M> {
+impl<M: MaterialInstanced> PartialEq for InstanceBatchKey<M> {
     fn eq(&self, other: &Self) -> bool {
         self.mesh_key == other.mesh_key && self.material_key == other.material_key
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Eq for InstanceBatchKey<M> {}
+impl<M: MaterialInstanced> Eq for InstanceBatchKey<M> {}
 
-impl<M: SpecializedInstancedMaterial> PartialOrd for InstanceBatchKey<M>
+impl<M: MaterialInstanced> PartialOrd for InstanceBatchKey<M>
 where
     M::BatchKey: PartialOrd,
 {
@@ -330,7 +340,7 @@ where
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Ord for InstanceBatchKey<M>
+impl<M: MaterialInstanced> Ord for InstanceBatchKey<M>
 where
     M::BatchKey: Ord,
 {
@@ -343,9 +353,9 @@ where
     }
 }
 
-impl<M: SpecializedInstancedMaterial> std::fmt::Debug for InstanceBatchKey<M>
+impl<M: MaterialInstanced> Debug for InstanceBatchKey<M>
 where
-    M::BatchKey: std::fmt::Debug,
+    M::BatchKey: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InstanceKey")
@@ -365,7 +375,7 @@ pub struct MeshBatch {
 
 pub const MAX_UNIFORM_BUFFER_INSTANCES: usize = 112;
 
-pub enum GpuInstances<M: SpecializedInstancedMaterial> {
+pub enum GpuInstances<M: MaterialInstanced> {
     Uniform {
         buffer: DynamicUniformBuffer<
             [<M::Instance as Instance>::PreparedInstance; MAX_UNIFORM_BUFFER_INSTANCES],
@@ -376,7 +386,7 @@ pub enum GpuInstances<M: SpecializedInstancedMaterial> {
     },
 }
 
-impl<M: SpecializedInstancedMaterial> GpuInstances<M> {
+impl<M: MaterialInstanced> GpuInstances<M> {
     pub fn new(buffer_binding_type: BufferBindingType) -> Self {
         match buffer_binding_type {
             BufferBindingType::Storage { .. } => Self::storage(),
@@ -457,13 +467,13 @@ impl<M: SpecializedInstancedMaterial> GpuInstances<M> {
     }
 }
 
-pub struct InstanceBatch<M: SpecializedInstancedMaterial> {
+pub struct InstanceBatch<M: MaterialInstanced> {
     pub instances: BTreeSet<Entity>,
     pub instance_block_ranges: BTreeMap<Entity, InstanceBlockRange>,
     pub instance_buffer_data: GpuInstances<M>,
 }
 
-impl<M: SpecializedInstancedMaterial> std::fmt::Debug for InstanceBatch<M> {
+impl<M: MaterialInstanced> Debug for InstanceBatch<M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InstanceBatch")
             .field("instances", &self.instances)
@@ -473,11 +483,11 @@ impl<M: SpecializedInstancedMaterial> std::fmt::Debug for InstanceBatch<M> {
 }
 
 #[derive(Deref, DerefMut)]
-pub struct InstanceViewMeta<M: SpecializedInstancedMaterial> {
+pub struct InstanceViewMeta<M: MaterialInstanced> {
     pub view_meta: BTreeMap<Entity, InstanceMeta<M>>,
 }
 
-impl<M: SpecializedInstancedMaterial> Default for InstanceViewMeta<M> {
+impl<M: MaterialInstanced> Default for InstanceViewMeta<M> {
     fn default() -> Self {
         Self {
             view_meta: default(),
@@ -485,12 +495,15 @@ impl<M: SpecializedInstancedMaterial> Default for InstanceViewMeta<M> {
     }
 }
 
-pub struct MaterialBatch<M: SpecializedInstancedMaterial> {
+pub struct MaterialBatch<M: MaterialInstanced> {
     pub material: Handle<M>,
-    pub pipeline_key: M::PipelineKey,
+    pub pipeline_key: M::Data,
 }
 
-impl<M: SpecializedInstancedMaterial> std::fmt::Debug for MaterialBatch<M> {
+impl<M: MaterialInstanced> Debug for MaterialBatch<M>
+where
+    M::Data: Debug,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MaterialBatch")
             .field("material", &self.material)
@@ -500,7 +513,7 @@ impl<M: SpecializedInstancedMaterial> std::fmt::Debug for MaterialBatch<M> {
 }
 
 /// Resource containing instance batches
-pub struct InstanceMeta<M: SpecializedInstancedMaterial> {
+pub struct InstanceMeta<M: MaterialInstanced> {
     pub instances: Vec<Entity>,
     pub instance_blocks: Vec<Entity>,
     pub mesh_batches: BTreeMap<InstancedMeshKey, MeshBatch>,
@@ -509,7 +522,7 @@ pub struct InstanceMeta<M: SpecializedInstancedMaterial> {
     pub batched_instances: BTreeMap<InstanceBatchKey<M>, BatchedInstances>,
 }
 
-impl<M: SpecializedInstancedMaterial> Default for InstanceMeta<M> {
+impl<M: MaterialInstanced> Default for InstanceMeta<M> {
     fn default() -> Self {
         Self {
             instances: default(),
@@ -578,9 +591,9 @@ pub type DrawInstanced<M> = (
 );
 
 /// Render command for drawing instanced meshes
-pub struct DrawBatchedInstances<M: SpecializedInstancedMaterial>(PhantomData<M>);
+pub struct DrawBatchedInstances<M: MaterialInstanced>(PhantomData<M>);
 
-impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstances<M> {
+impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
     type Param = (
         SRes<RenderDevice>,
         SRes<InstanceViewMeta<M>>,
@@ -691,4 +704,162 @@ impl<M: SpecializedInstancedMaterial> EntityRenderCommand for DrawBatchedInstanc
 
         RenderCommandResult::Success
     }
+}
+
+/// Common [`Material`] properties, calculated for a specific material instance.
+pub struct MaterialProperties {
+    /// The [`AlphaMode`] of this material.
+    pub alpha_mode: AlphaMode,
+    /// Add a bias to the view depth of the mesh which can be used to force a specific render order
+    /// for meshes with equal depth, to avoid z-fighting.
+    pub depth_bias: f32,
+}
+
+/// Data prepared for a [`Material`] instance.
+pub struct PreparedMaterial<T: MaterialInstanced> {
+    pub bindings: Vec<OwnedBindingResource>,
+    pub bind_group: BindGroup,
+    pub pipeline_key: T::Data,
+    pub batch_key: T::BatchKey,
+    pub properties: MaterialProperties,
+}
+
+struct ExtractedMaterials<M: MaterialInstanced> {
+    extracted: Vec<(Handle<M>, M)>,
+    removed: Vec<Handle<M>>,
+}
+
+impl<M: MaterialInstanced> Default for ExtractedMaterials<M> {
+    fn default() -> Self {
+        Self {
+            extracted: Default::default(),
+            removed: Default::default(),
+        }
+    }
+}
+
+/// Stores all prepared representations of [`Material`] assets for as long as they exist.
+pub type RenderMaterials<T> = HashMap<Handle<T>, PreparedMaterial<T>>;
+
+/// This system extracts all created or modified assets of the corresponding [`Material`] type
+/// into the "render world".
+fn extract_materials<M: MaterialInstanced>(
+    mut commands: Commands,
+    mut events: Extract<EventReader<AssetEvent<M>>>,
+    assets: Extract<Res<Assets<M>>>,
+) {
+    let mut changed_assets = HashSet::default();
+    let mut removed = Vec::new();
+    for event in events.iter() {
+        match event {
+            AssetEvent::Created { handle } | AssetEvent::Modified { handle } => {
+                changed_assets.insert(handle.clone_weak());
+            }
+            AssetEvent::Removed { handle } => {
+                changed_assets.remove(handle);
+                removed.push(handle.clone_weak());
+            }
+        }
+    }
+
+    let mut extracted_assets = Vec::new();
+    for handle in changed_assets.drain() {
+        if let Some(asset) = assets.get(&handle) {
+            extracted_assets.push((handle, asset.clone()));
+        }
+    }
+
+    commands.insert_resource(ExtractedMaterials {
+        extracted: extracted_assets,
+        removed,
+    });
+}
+
+/// All [`Material`] values of a given type that should be prepared next frame.
+pub struct PrepareNextFrameMaterials<M: MaterialInstanced> {
+    assets: Vec<(Handle<M>, M)>,
+}
+
+impl<M: MaterialInstanced> Default for PrepareNextFrameMaterials<M> {
+    fn default() -> Self {
+        Self {
+            assets: Default::default(),
+        }
+    }
+}
+
+/// This system prepares all assets of the corresponding [`Material`] type
+/// which where extracted this frame for the GPU.
+fn prepare_materials<M: MaterialInstanced>(
+    mut prepare_next_frame: Local<PrepareNextFrameMaterials<M>>,
+    mut extracted_assets: ResMut<ExtractedMaterials<M>>,
+    mut render_materials: ResMut<RenderMaterials<M>>,
+    render_device: Res<RenderDevice>,
+    images: Res<RenderAssets<Image>>,
+    fallback_image: Res<FallbackImage>,
+    pipeline: Res<InstancedMaterialPipeline<M>>,
+) {
+    let mut queued_assets = std::mem::take(&mut prepare_next_frame.assets);
+    for (handle, material) in queued_assets.drain(..) {
+        match prepare_material(
+            &material,
+            &render_device,
+            &images,
+            &fallback_image,
+            &pipeline,
+        ) {
+            Ok(prepared_asset) => {
+                render_materials.insert(handle, prepared_asset);
+            }
+            Err(AsBindGroupError::RetryNextUpdate) => {
+                prepare_next_frame.assets.push((handle, material));
+            }
+        }
+    }
+
+    for removed in std::mem::take(&mut extracted_assets.removed) {
+        render_materials.remove(&removed);
+    }
+
+    for (handle, material) in std::mem::take(&mut extracted_assets.extracted) {
+        match prepare_material(
+            &material,
+            &render_device,
+            &images,
+            &fallback_image,
+            &pipeline,
+        ) {
+            Ok(prepared_asset) => {
+                render_materials.insert(handle, prepared_asset);
+            }
+            Err(AsBindGroupError::RetryNextUpdate) => {
+                prepare_next_frame.assets.push((handle, material));
+            }
+        }
+    }
+}
+
+fn prepare_material<M: MaterialInstanced>(
+    material: &M,
+    render_device: &RenderDevice,
+    images: &RenderAssets<Image>,
+    fallback_image: &FallbackImage,
+    pipeline: &InstancedMaterialPipeline<M>,
+) -> Result<PreparedMaterial<M>, AsBindGroupError> {
+    let prepared = material.as_bind_group(
+        &pipeline.material_layout,
+        render_device,
+        images,
+        fallback_image,
+    )?;
+    Ok(PreparedMaterial {
+        bindings: prepared.bindings,
+        bind_group: prepared.bind_group,
+        pipeline_key: prepared.data,
+        batch_key: M::BatchKey::from(material),
+        properties: MaterialProperties {
+            alpha_mode: material.alpha_mode(),
+            depth_bias: material.depth_bias(),
+        },
+    })
 }

@@ -7,24 +7,22 @@ use bevy::{
             SystemParamItem,
         },
     },
-    render::{
-        render_asset::RenderAssets,
-        render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
-    }, prelude::debug,
+    prelude::debug,
+    render::render_phase::{EntityRenderCommand, RenderCommandResult, TrackedRenderPass},
 };
 
-use crate::prelude::SpecializedInstancedMaterial;
+use crate::prelude::MaterialInstanced;
 
 use std::marker::PhantomData;
 
-pub struct SetInstancedMaterialBindGroup<M: SpecializedInstancedMaterial, const I: usize>(
-    PhantomData<M>,
-);
+use super::plugin::RenderMaterials;
 
-impl<M: SpecializedInstancedMaterial, const I: usize> EntityRenderCommand
+pub struct SetInstancedMaterialBindGroup<M: MaterialInstanced, const I: usize>(PhantomData<M>);
+
+impl<M: MaterialInstanced, const I: usize> EntityRenderCommand
     for SetInstancedMaterialBindGroup<M, I>
 {
-    type Param = (SRes<RenderAssets<M>>, SQuery<Read<Handle<M>>>);
+    type Param = (SRes<RenderMaterials<M>>, SQuery<Read<Handle<M>>>);
     fn render<'w>(
         _view: Entity,
         item: Entity,
@@ -39,12 +37,7 @@ impl<M: SpecializedInstancedMaterial, const I: usize> EntityRenderCommand
 
         let material_handle = query.get(item).unwrap();
         let material = materials.into_inner().get(material_handle).unwrap();
-        pass.set_bind_group(
-            I,
-            M::bind_group(material),
-            M::dynamic_uniform_indices(material),
-        );
+        pass.set_bind_group(I, &material.bind_group, &[]);
         RenderCommandResult::Success
     }
 }
-

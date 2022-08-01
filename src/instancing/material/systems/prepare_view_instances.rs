@@ -5,12 +5,12 @@ use bevy::{
 
 use crate::instancing::{
     material::{
-        plugin::InstanceViewMeta, specialized_instanced_material::SpecializedInstancedMaterial,
+        plugin::InstanceViewMeta, specialized_instanced_material::MaterialInstanced,
     },
     render::instance::Instance,
 };
 
-pub fn system<M: SpecializedInstancedMaterial>(
+pub fn system<M: MaterialInstanced>(
     query_views: Query<(Entity, &VisibleEntities), With<ExtractedView>>,
     query_instance: Query<
         (Entity,),

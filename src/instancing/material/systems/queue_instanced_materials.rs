@@ -1,7 +1,9 @@
+use std::hash::Hash;
+
 use bevy::{
     core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
     pbr::MeshPipelineKey,
-    prelude::{debug, error, Msaa, Query, Res, ResMut, info},
+    prelude::{debug, error, info, Msaa, Query, Res, ResMut},
     render::{
         render_phase::{DrawFunctions, RenderPhase},
         render_resource::{PipelineCache, SpecializedMeshPipelines},
@@ -11,11 +13,11 @@ use bevy::{
 use crate::instancing::material::{
     instanced_material_pipeline::{InstancedMaterialPipeline, InstancedMaterialPipelineKey},
     plugin::{DrawInstanced, GpuAlphaMode, InstanceViewMeta},
-    specialized_instanced_material::SpecializedInstancedMaterial,
+    specialized_instanced_material::MaterialInstanced,
 };
 
 #[allow(clippy::too_many_arguments)]
-pub fn system<M: SpecializedInstancedMaterial>(
+pub fn system<M: MaterialInstanced>(
     opaque_draw_functions: Res<DrawFunctions<Opaque3d>>,
     alpha_mask_draw_functions: Res<DrawFunctions<AlphaMask3d>>,
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
@@ -27,7 +29,9 @@ pub fn system<M: SpecializedInstancedMaterial>(
     mut query_opaque_3d: Query<&mut RenderPhase<Opaque3d>>,
     mut query_alpha_mask_3d: Query<&mut RenderPhase<AlphaMask3d>>,
     mut query_transparent_3d: Query<&mut RenderPhase<Transparent3d>>,
-) {
+) where
+    M::Data: Clone + Hash + PartialEq + Eq,
+{
     debug!("{}", std::any::type_name::<M>());
 
     for (view_entity, instance_meta) in instance_view_meta.iter() {

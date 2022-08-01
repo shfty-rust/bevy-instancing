@@ -41,7 +41,7 @@ use bevy::{
 use bevy_instancing::prelude::{
     CustomMaterial, CustomMaterialPlugin, GpuColorMeshInstance, IndirectRenderingPlugin,
     InstanceBlock, InstanceBlockBuffer, InstanceBlockBundle, InstanceBlockRange,
-    SpecializedInstancedMaterial,
+    MaterialInstanced,
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -77,15 +77,15 @@ impl Into<NodeLabel> for InstanceCompute {
     }
 }
 
-struct InstanceComputePlugin<M: SpecializedInstancedMaterial>(PhantomData<M>);
+struct InstanceComputePlugin<M: MaterialInstanced>(PhantomData<M>);
 
-impl<M: SpecializedInstancedMaterial> Default for InstanceComputePlugin<M> {
+impl<M: MaterialInstanced> Default for InstanceComputePlugin<M> {
     fn default() -> Self {
         Self(default())
     }
 }
 
-impl<M: SpecializedInstancedMaterial> Plugin for InstanceComputePlugin<M> {
+impl<M: MaterialInstanced> Plugin for InstanceComputePlugin<M> {
     fn build(&self, app: &mut App) {
         load_internal_asset!(
             app,
@@ -213,7 +213,7 @@ impl Node for InstanceComputeNode {
     }
 }
 
-pub fn queue_compute_instances<M: SpecializedInstancedMaterial>(
+pub fn queue_compute_instances<M: MaterialInstanced>(
     pipeline: Res<InstanceComputePipeline>,
     render_device: Res<RenderDevice>,
     query_instance_block: Query<

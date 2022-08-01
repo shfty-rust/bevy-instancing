@@ -16,12 +16,12 @@ use crate::instancing::{
             GpuIndexBufferData, GpuIndirectData, GpuInstancedMeshes, InstanceViewMeta,
             InstancedMeshKey, MeshBatch,
         },
-        specialized_instanced_material::SpecializedInstancedMaterial,
+        specialized_instanced_material::MaterialInstanced,
     },
     render::instance::Instance,
 };
 
-pub fn system<M: SpecializedInstancedMaterial>(
+pub fn system<M: MaterialInstanced>(
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
     render_meshes: Res<GpuInstancedMeshes<M>>,
     query_views: Query<Entity, (With<ExtractedView>, With<VisibleEntities>)>,

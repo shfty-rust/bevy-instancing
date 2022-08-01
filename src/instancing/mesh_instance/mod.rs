@@ -11,7 +11,7 @@ use bevy::{
 };
 use crate::prelude::Instance;
 
-use super::material::specialized_instanced_material::SpecializedInstancedMaterial;
+use super::material::specialized_instanced_material::MaterialInstanced;
 
 #[derive(Debug, Default, Clone, PartialEq, Component)]
 pub struct MeshInstance {
@@ -102,7 +102,7 @@ impl Instance for MeshInstance {
     }
 }
 
-pub fn extract_mesh_instances<M: SpecializedInstancedMaterial>(
+pub fn extract_mesh_instances<M: MaterialInstanced>(
     query_mesh_instance: Extract<Query<(Entity, <M::Instance as Instance>::Query)>>,
     mut commands: Commands,
 ) {

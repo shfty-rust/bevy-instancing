@@ -19,14 +19,14 @@ use crate::instancing::{
             BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
             GpuInstancedMeshes, InstanceBatchKey, InstanceViewMeta, MeshBatch,
         },
-        specialized_instanced_material::SpecializedInstancedMaterial,
+        specialized_instanced_material::MaterialInstanced,
     },
     render::instance::Instance,
 };
 use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
 
 #[allow(clippy::too_many_arguments)]
-pub fn system<M: SpecializedInstancedMaterial>(
+pub fn system<M: MaterialInstanced>(
     instanced_material_pipeline: Res<InstancedMaterialPipeline<M>>,
     render_meshes: Res<GpuInstancedMeshes<M>>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,

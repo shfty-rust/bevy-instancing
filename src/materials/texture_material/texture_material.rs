@@ -7,22 +7,26 @@ use bevy::{
         mesh::MeshVertexBufferLayout,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssets},
         render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout,
-            BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingResource, BindingType, Face,
-            RenderPipelineDescriptor, SamplerBindingType, ShaderStages,
-            SpecializedMeshPipelineError, TextureSampleType, TextureViewDimension,
+            AsBindGroup, BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Face,
+            RenderPipelineDescriptor, SpecializedMeshPipelineError,
         },
         renderer::RenderDevice,
     },
 };
 
-use crate::prelude::{ColorMeshInstance, InstancedMaterialPipeline, SpecializedInstancedMaterial};
+use crate::{
+    instancing::material::specialized_instanced_material::AsBatch,
+    prelude::{ColorMeshInstance, InstancedMaterialPipeline, MaterialInstanced},
+};
 
 use super::plugin::TEXTURE_SHADER_HANDLE;
 
-#[derive(Debug, Clone, TypeUuid)]
+#[derive(Debug, Clone, AsBindGroup, TypeUuid)]
 #[uuid = "335058d3-aa56-4b1b-b0aa-cf483b2c6ca4"]
+#[bind_group_data(TextureMaterialPipelineKey)]
 pub struct TextureMaterial {
+    #[texture(0)]
+    #[sampler(1)]
     pub texture: Handle<Image>,
     pub alpha_mode: AlphaMode,
     pub cull_mode: Option<Face>,
@@ -77,7 +81,7 @@ impl RenderAsset for TextureMaterial {
                 BindGroupEntry {
                     binding: 1,
                     resource: BindingResource::Sampler(&gpu_image.sampler),
-                }
+                },
             ],
             label: None,
             layout: &material_pipeline.material_layout,
@@ -113,6 +117,14 @@ impl Ord for TextureMaterialPipelineKey {
     }
 }
 
+impl From<&TextureMaterial> for TextureMaterialPipelineKey {
+    fn from(texture_material: &TextureMaterial) -> Self {
+        TextureMaterialPipelineKey {
+            cull_mode: texture_material.cull_mode,
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct TextureMaterialBatchKey {
     pub texture: Handle<Image>,
@@ -143,25 +155,21 @@ impl Ord for TextureMaterialBatchKey {
     }
 }
 
-impl SpecializedInstancedMaterial for TextureMaterial {
-    type PipelineKey = TextureMaterialPipelineKey;
-    type BatchKey = TextureMaterialBatchKey;
-    type Instance = ColorMeshInstance;
-
-    fn pipeline_key(
-        render_asset: &<TextureMaterial as RenderAsset>::PreparedAsset,
-    ) -> Self::PipelineKey {
-        TextureMaterialPipelineKey {
-            cull_mode: render_asset.cull_mode,
-        }
-    }
-
-    fn batch_key(render_asset: &<TextureMaterial as RenderAsset>::PreparedAsset) -> Self::BatchKey {
+impl From<&TextureMaterial> for TextureMaterialBatchKey {
+    fn from(texture_material: &TextureMaterial) -> Self {
         TextureMaterialBatchKey {
-            texture: render_asset.texture.clone_weak(),
-            cull_mode: render_asset.cull_mode,
+            texture: texture_material.texture.clone_weak(),
+            cull_mode: texture_material.cull_mode,
         }
     }
+}
+
+impl AsBatch for TextureMaterial {
+    type BatchKey = TextureMaterialBatchKey;
+}
+
+impl MaterialInstanced for TextureMaterial {
+    type Instance = ColorMeshInstance;
 
     fn vertex_shader(_: &AssetServer) -> Option<Handle<Shader>> {
         Some(TEXTURE_SHADER_HANDLE.typed::<Shader>())
@@ -174,7 +182,7 @@ impl SpecializedInstancedMaterial for TextureMaterial {
     fn specialize(
         _pipeline: &InstancedMaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,
-        key: Self::PipelineKey,
+        key: Self::Data,
         _layout: &MeshVertexBufferLayout,
     ) -> Result<(), SpecializedMeshPipelineError> {
         descriptor.primitive.cull_mode = key.cull_mode;
@@ -184,35 +192,7 @@ impl SpecializedInstancedMaterial for TextureMaterial {
         Ok(())
     }
 
-    fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
-        &render_asset.bind_group
-    }
-
-    fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
-        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            entries: &[
-                BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Texture {
-                        sample_type: TextureSampleType::Float { filterable: true },
-                        view_dimension: TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: ShaderStages::FRAGMENT,
-                    ty: BindingType::Sampler(SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-            label: Some("texture material layout"),
-        })
-    }
-
-    fn alpha_mode(material: &<Self as RenderAsset>::PreparedAsset) -> AlphaMode {
-        material.alpha_mode
+    fn alpha_mode(&self) -> AlphaMode {
+        self.alpha_mode
     }
 }

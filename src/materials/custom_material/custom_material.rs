@@ -7,19 +7,24 @@ use bevy::{
         mesh::MeshVertexBufferLayout,
         render_asset::{PrepareAssetError, RenderAsset},
         render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor, Face,
-            RenderPipelineDescriptor, SpecializedMeshPipelineError,
+            AsBindGroup, BindGroup, BindGroupDescriptor, BindGroupLayout,
+            BindGroupLayoutDescriptor, Face, RenderPipelineDescriptor,
+            SpecializedMeshPipelineError,
         },
         renderer::RenderDevice,
     },
 };
 
-use crate::prelude::{
-    InstancedMaterialPipeline, SpecializedInstancedMaterial, CUSTOM_SHADER_HANDLE, ColorMeshInstance,
+use crate::{
+    instancing::material::specialized_instanced_material::AsBatch,
+    prelude::{
+        ColorMeshInstance, InstancedMaterialPipeline, MaterialInstanced, CUSTOM_SHADER_HANDLE,
+    },
 };
 
-#[derive(Debug, Clone, TypeUuid)]
+#[derive(Debug, Clone, AsBindGroup, TypeUuid)]
 #[uuid = "6dc3b9fc-fcfd-4149-8f20-5d3a1573e5da"]
+#[bind_group_data(CustomMaterialKey)]
 pub struct CustomMaterial {
     pub alpha_mode: AlphaMode,
     pub cull_mode: Option<Face>,
@@ -88,22 +93,20 @@ impl Ord for CustomMaterialKey {
     }
 }
 
-impl SpecializedInstancedMaterial for CustomMaterial {
-    type PipelineKey = CustomMaterialKey;
+impl From<&CustomMaterial> for CustomMaterialKey {
+    fn from(custom_material: &CustomMaterial) -> Self {
+        CustomMaterialKey {
+            cull_mode: custom_material.cull_mode,
+        }
+    }
+}
+
+impl AsBatch for CustomMaterial {
     type BatchKey = CustomMaterialKey;
+}
+
+impl MaterialInstanced for CustomMaterial {
     type Instance = ColorMeshInstance;
-
-    fn pipeline_key(render_asset: &<CustomMaterial as RenderAsset>::PreparedAsset) -> Self::BatchKey {
-        CustomMaterialKey {
-            cull_mode: render_asset.cull_mode,
-        }
-    }
-
-    fn batch_key(render_asset: &<CustomMaterial as RenderAsset>::PreparedAsset) -> Self::BatchKey {
-        CustomMaterialKey {
-            cull_mode: render_asset.cull_mode,
-        }
-    }
 
     fn vertex_shader(_: &AssetServer) -> Option<Handle<Shader>> {
         Some(CUSTOM_SHADER_HANDLE.typed::<Shader>())
@@ -126,18 +129,7 @@ impl SpecializedInstancedMaterial for CustomMaterial {
         Ok(())
     }
 
-    fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
-        &render_asset.bind_group
-    }
-
-    fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
-        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            entries: &[],
-            label: Some("material layout"),
-        })
-    }
-
-    fn alpha_mode(material: &<Self as RenderAsset>::PreparedAsset) -> AlphaMode {
-        material.alpha_mode
+    fn alpha_mode(&self) -> AlphaMode {
+        self.alpha_mode
     }
 }

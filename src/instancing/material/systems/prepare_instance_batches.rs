@@ -3,31 +3,29 @@ use std::collections::{BTreeMap, BTreeSet};
 use bevy::{
     prelude::{debug, default, info, Entity, Handle, Mesh, Query, Res, ResMut, With},
     render::{
-        render_asset::RenderAssets,
         renderer::RenderDevice,
         view::{ExtractedView, VisibleEntities},
     },
     utils::FloatOrd,
 };
-use wgpu::BufferBindingType;
 
 use crate::instancing::{
     instance_block::{InstanceBlock, InstanceBlockRange},
     material::{
         plugin::{
             GpuAlphaMode, GpuInstancedMeshes, GpuInstances, InstanceBatch, InstanceBatchKey,
-            InstanceViewMeta, InstancedMaterialBatchKey, MeshBatch,
+            InstanceViewMeta, InstancedMaterialBatchKey, MeshBatch, RenderMaterials,
         },
-        specialized_instanced_material::SpecializedInstancedMaterial,
+        specialized_instanced_material::MaterialInstanced,
     },
     render::instance::Instance,
 };
 
-pub fn system<M: SpecializedInstancedMaterial>(
+pub fn system<M: MaterialInstanced>(
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
     render_device: Res<RenderDevice>,
     render_meshes: Res<GpuInstancedMeshes<M>>,
-    render_materials: Res<RenderAssets<M>>,
+    render_materials: Res<RenderMaterials<M>>,
     mut query_views: Query<(Entity, &ExtractedView), With<VisibleEntities>>,
     query_instance: Query<(
         Entity,
@@ -78,10 +76,10 @@ pub fn system<M: SpecializedInstancedMaterial>(
                     continue;
                 };
 
-                let alpha_mode = GpuAlphaMode::from(M::alpha_mode(material));
+                let alpha_mode = GpuAlphaMode::from(material.properties.alpha_mode);
                 let material_key = InstancedMaterialBatchKey {
                     alpha_mode,
-                    key: M::batch_key(material),
+                    key: material.batch_key.clone(),
                 };
 
                 let mesh_z =
@@ -131,10 +129,10 @@ pub fn system<M: SpecializedInstancedMaterial>(
                 let mesh_key = mesh.key.clone();
 
                 let material = render_materials.get(material_handle).unwrap();
-                let alpha_mode = GpuAlphaMode::from(M::alpha_mode(material));
+                let alpha_mode = GpuAlphaMode::from(material.properties.alpha_mode);
                 let material_key = InstancedMaterialBatchKey {
                     alpha_mode,
-                    key: M::batch_key(material),
+                    key: material.batch_key.clone(),
                 };
 
                 let key = InstanceBatchKey {

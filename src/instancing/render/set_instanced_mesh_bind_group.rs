@@ -12,16 +12,16 @@ use bevy::{
     },
 };
 
-use crate::prelude::{InstanceBatchKey, InstanceViewMeta, SpecializedInstancedMaterial};
+use crate::prelude::{InstanceBatchKey, InstanceViewMeta, MaterialInstanced};
 
 use super::instance::Instance;
 
 /// Render command for drawing instanced meshes
-pub struct SetInstancedMeshBindGroup<M: SpecializedInstancedMaterial, const I: usize>(
+pub struct SetInstancedMeshBindGroup<M: MaterialInstanced, const I: usize>(
     PhantomData<M>,
 );
 
-impl<M: SpecializedInstancedMaterial, const I: usize> EntityRenderCommand
+impl<M: MaterialInstanced, const I: usize> EntityRenderCommand
     for SetInstancedMeshBindGroup<M, I>
 where
     <M::Instance as Instance>::PreparedInstance: ShaderType,

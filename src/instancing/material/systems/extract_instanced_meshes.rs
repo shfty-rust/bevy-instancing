@@ -7,10 +7,10 @@ use bevy::{
 
 use crate::instancing::material::{
     plugin::{GpuIndexBufferData, GpuInstancedMesh, GpuInstancedMeshes, InstancedMeshKey},
-    specialized_instanced_material::SpecializedInstancedMaterial,
+    specialized_instanced_material::MaterialInstanced,
 };
 
-pub fn system<M: SpecializedInstancedMaterial>(
+pub fn system<M: MaterialInstanced>(
     meshes: Extract<Res<Assets<Mesh>>>,
     query_instance: Extract<Query<&Handle<Mesh>, With<Handle<M>>>>,
     mut commands: Commands,

@@ -6,17 +6,53 @@ use bevy::{
     render::{
         render_asset::{PrepareAssetError, RenderAsset},
         render_resource::{
-            BindGroup, BindGroupDescriptor, BindGroupLayout, BindGroupLayoutDescriptor,
+            AsBindGroup, BindGroup, BindGroupDescriptor, BindGroupLayout,
+            BindGroupLayoutDescriptor, PreparedBindGroup,
         },
         renderer::RenderDevice,
     },
 };
 
-use crate::prelude::{InstancedMaterial, InstancedMaterialPipeline, MeshInstance};
+use crate::{
+    instancing::material::specialized_instanced_material::{AsBatch, MaterialInstanced},
+    prelude::{InstancedMaterialPipeline, MeshInstance},
+};
 
 #[derive(Debug, Default, Clone, TypeUuid)]
 #[uuid = "40d95476-3236-4c43-a1c9-1f0645ca762a"]
 pub struct BasicMaterial;
+
+impl AsBindGroup for BasicMaterial {
+    type Data = ();
+
+    fn as_bind_group(
+        &self,
+        layout: &BindGroupLayout,
+        render_device: &RenderDevice,
+        images: &bevy::render::render_asset::RenderAssets<bevy::prelude::Image>,
+        fallback_image: &bevy::render::texture::FallbackImage,
+    ) -> Result<
+        bevy::render::render_resource::PreparedBindGroup<Self>,
+        bevy::render::render_resource::AsBindGroupError,
+    > {
+        Ok(PreparedBindGroup {
+            bindings: vec![],
+            bind_group: render_device.create_bind_group(&BindGroupDescriptor {
+                label: Some("BasicMaterial Bind Group"),
+                layout,
+                entries: &[],
+            }),
+            data: (),
+        })
+    }
+
+    fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
+        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("BasicMaterial Bind Group Layout"),
+            entries: &[],
+        })
+    }
+}
 
 #[derive(Clone)]
 pub struct GpuBasicMaterial {
@@ -45,17 +81,14 @@ impl RenderAsset for BasicMaterial {
     }
 }
 
-impl InstancedMaterial for BasicMaterial {
+impl From<&BasicMaterial> for () {
+    fn from(_: &BasicMaterial) -> Self {}
+}
+
+impl AsBatch for BasicMaterial {
+    type BatchKey = ();
+}
+
+impl MaterialInstanced for BasicMaterial {
     type Instance = MeshInstance;
-
-    fn bind_group(render_asset: &<Self as RenderAsset>::PreparedAsset) -> &BindGroup {
-        &render_asset.bind_group
-    }
-
-    fn bind_group_layout(render_device: &RenderDevice) -> BindGroupLayout {
-        render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
-            entries: &[],
-            label: Some("material layout"),
-        })
-    }
 }

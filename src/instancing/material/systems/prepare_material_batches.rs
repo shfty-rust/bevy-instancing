@@ -1,25 +1,25 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fmt::Debug};
 
 use bevy::{
-    prelude::{debug, Entity, Handle, Query, Res, ResMut, With, info},
-    render::{
-        render_asset::RenderAssets,
-        view::{ExtractedView, VisibleEntities},
-    },
+    prelude::{debug, info, Entity, Handle, Query, Res, ResMut, With},
+    render::view::{ExtractedView, VisibleEntities},
 };
 
 use crate::instancing::{
     instance_block::InstanceBlock,
     material::{
-        plugin::{InstanceViewMeta, InstancedMaterialBatchKey, MaterialBatch},
-        specialized_instanced_material::SpecializedInstancedMaterial,
+        plugin::{
+            GpuAlphaMode, InstanceViewMeta, InstancedMaterialBatchKey, MaterialBatch,
+            RenderMaterials,
+        },
+        specialized_instanced_material::MaterialInstanced,
     },
     render::instance::Instance,
 };
 
-pub fn system<M: SpecializedInstancedMaterial>(
+pub fn system<M: MaterialInstanced>(
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
-    render_materials: Res<RenderAssets<M>>,
+    render_materials: Res<RenderMaterials<M>>,
     mut query_views: Query<Entity, (With<ExtractedView>, With<VisibleEntities>)>,
     query_instance: Query<(
         Entity,
@@ -27,7 +27,9 @@ pub fn system<M: SpecializedInstancedMaterial>(
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
     query_instance_block: Query<(Entity, &Handle<M>, &InstanceBlock)>,
-) {
+) where
+    M::Data: Debug + Clone,
+{
     debug!("{}", std::any::type_name::<M>());
 
     for view_entity in query_views.iter_mut() {
@@ -56,12 +58,12 @@ pub fn system<M: SpecializedInstancedMaterial>(
                 let material = render_materials.get(&material_handle)?;
                 Some((
                     InstancedMaterialBatchKey {
-                        alpha_mode: M::alpha_mode(material).into(),
-                        key: M::batch_key(material),
+                        alpha_mode: GpuAlphaMode::from(material.properties.alpha_mode),
+                        key: material.batch_key.clone(),
                     },
                     MaterialBatch {
                         material: material_handle,
-                        pipeline_key: M::pipeline_key(material),
+                        pipeline_key: material.pipeline_key.clone(),
                     },
                 ))
             })

@@ -3,11 +3,11 @@ use bevy::{
     render::view::NoFrustumCulling,
 };
 
-use crate::prelude::{InstanceBlock, SpecializedInstancedMaterial};
+use crate::prelude::{InstanceBlock, MaterialInstanced};
 
 /// Components to create a mesh instance
 #[derive(Bundle)]
-pub struct InstanceBlockBundle<M: SpecializedInstancedMaterial> {
+pub struct InstanceBlockBundle<M: MaterialInstanced> {
     pub material: Handle<M>,
     pub mesh: Handle<Mesh>,
     pub mesh_instance_block: InstanceBlock,
@@ -16,7 +16,7 @@ pub struct InstanceBlockBundle<M: SpecializedInstancedMaterial> {
     pub no_frustum_culling: NoFrustumCulling,
 }
 
-impl<M: SpecializedInstancedMaterial> Default for InstanceBlockBundle<M> {
+impl<M: MaterialInstanced> Default for InstanceBlockBundle<M> {
     fn default() -> Self {
         Self {
             material: default(),

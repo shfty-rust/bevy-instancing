@@ -6,11 +6,11 @@ use bevy::{
 use crate::instancing::{
     instance_block::InstanceBlock,
     material::{
-        plugin::InstanceViewMeta, specialized_instanced_material::SpecializedInstancedMaterial,
+        plugin::InstanceViewMeta, specialized_instanced_material::MaterialInstanced,
     },
 };
 
-pub fn system<M: SpecializedInstancedMaterial>(
+pub fn system<M: MaterialInstanced>(
     query_views: Query<(Entity, &VisibleEntities), With<ExtractedView>>,
     query_instance_block: Query<Entity, (With<Handle<M>>, With<InstanceBlock>)>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
