@@ -103,8 +103,20 @@ impl<M: MaterialInstanced> FromWorld for InstancedMaterialPipeline<M> {
         InstancedMaterialPipeline {
             instanced_mesh_pipeline: world.resource::<InstancedMeshPipeline>().clone(),
             material_layout,
-            vertex_shader: M::vertex_shader(asset_server),
-            fragment_shader: M::fragment_shader(asset_server),
+            vertex_shader: match M::vertex_shader(asset_server) {
+                bevy::render::render_resource::ShaderRef::Default => None,
+                bevy::render::render_resource::ShaderRef::Handle(handle) => Some(handle),
+                bevy::render::render_resource::ShaderRef::Path(path) => {
+                    Some(asset_server.load(path))
+                }
+            },
+            fragment_shader: match M::fragment_shader(asset_server) {
+                bevy::render::render_resource::ShaderRef::Default => None,
+                bevy::render::render_resource::ShaderRef::Handle(handle) => Some(handle),
+                bevy::render::render_resource::ShaderRef::Path(path) => {
+                    Some(asset_server.load(path))
+                }
+            },
             marker: PhantomData,
         }
     }

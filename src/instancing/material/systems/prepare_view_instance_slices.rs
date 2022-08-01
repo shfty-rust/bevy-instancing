@@ -1,18 +1,16 @@
 use bevy::{
-    prelude::{info, Entity, Handle, Query, ResMut, With, debug},
+    prelude::{debug, info, Entity, Handle, Query, ResMut, With},
     render::view::{ExtractedView, VisibleEntities},
 };
 
 use crate::instancing::{
-    instance_block::InstanceBlock,
-    material::{
-        plugin::InstanceViewMeta, specialized_instanced_material::MaterialInstanced,
-    },
+    instance_slice::InstanceSlice,
+    material::{plugin::InstanceViewMeta, specialized_instanced_material::MaterialInstanced},
 };
 
 pub fn system<M: MaterialInstanced>(
     query_views: Query<(Entity, &VisibleEntities), With<ExtractedView>>,
-    query_instance_block: Query<Entity, (With<Handle<M>>, With<InstanceBlock>)>,
+    query_instance_slice: Query<Entity, (With<Handle<M>>, With<InstanceSlice>)>,
     mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
 ) {
     debug!("{}", std::any::type_name::<M>());
@@ -22,18 +20,18 @@ pub fn system<M: MaterialInstanced>(
 
         debug!("Visible entities: {visible_entities:#?}");
 
-        let instance_blocks = visible_entities
+        let instance_slices = visible_entities
             .entities
             .iter()
             .copied()
-            .filter(|entity| query_instance_block.get(*entity).is_ok())
+            .filter(|entity| query_instance_slice.get(*entity).is_ok())
             .collect::<Vec<_>>();
 
-        debug!("Instance blocks: {instance_blocks:#?}");
+        debug!("Instance slices: {instance_slices:#?}");
 
         instance_view_meta
             .get_mut(&view_entity)
             .unwrap()
-            .instance_blocks = instance_blocks;
+            .instance_slices = instance_slices;
     }
 }

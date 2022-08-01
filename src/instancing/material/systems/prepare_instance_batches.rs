@@ -10,7 +10,7 @@ use bevy::{
 };
 
 use crate::instancing::{
-    instance_block::{InstanceBlock, InstanceBlockRange},
+    instance_slice::{InstanceSlice, InstanceSliceRange},
     material::{
         plugin::{
             GpuAlphaMode, GpuInstancedMeshes, GpuInstances, InstanceBatch, InstanceBatchKey,
@@ -33,7 +33,7 @@ pub fn system<M: MaterialInstanced>(
         &Handle<Mesh>,
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
-    query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
+    query_instance_slice: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceSlice)>,
 ) {
     debug!("{}", std::any::type_name::<M>());
 
@@ -43,9 +43,8 @@ pub fn system<M: MaterialInstanced>(
         debug!("View {view_entity:?}");
         let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
 
-        // Fetch view matrix for sorting
-        let inverse_view_matrix = view.transform.compute_matrix().inverse();
-        let inverse_view_row_2 = inverse_view_matrix.row(2);
+        // Fetch view rangefinder for sorting
+        let rangefinder = view.rangefinder3d();
 
         let span = bevy::prelude::info_span!("Batch instances by key");
         let mut keyed_instances = span.in_scope(|| {
@@ -82,8 +81,8 @@ pub fn system<M: MaterialInstanced>(
                     key: material.batch_key.clone(),
                 };
 
-                let mesh_z =
-                    inverse_view_row_2.dot(<M::Instance as Instance>::transform(instance).col(3));
+                let mesh_z = rangefinder.distance(&<M::Instance as Instance>::transform(instance))
+                    + material.properties.depth_bias;
 
                 let dist = mesh_z
                     * if alpha_mode == GpuAlphaMode::Blend {
@@ -113,18 +112,18 @@ pub fn system<M: MaterialInstanced>(
             debug!("{key:#?}: {instance:#?}");
         }
 
-        let span = bevy::prelude::info_span!("Batch instance blocks by key");
-        let keyed_instance_blocks = span.in_scope(|| {
-            // Batch instance blocks by key
-            let mut keyed_instance_blocks =
-                BTreeMap::<InstanceBatchKey<M>, Vec<(Entity, &Handle<M>, &InstanceBlock)>>::new();
+        let span = bevy::prelude::info_span!("Batch instance slices by key");
+        let keyed_instance_slices = span.in_scope(|| {
+            // Batch instance slices by key
+            let mut keyed_instance_slices =
+                BTreeMap::<InstanceBatchKey<M>, Vec<(Entity, &Handle<M>, &InstanceSlice)>>::new();
 
-            for (entity, material_handle, mesh_handle, instance_block) in instance_meta
-                .instance_blocks
+            for (entity, material_handle, mesh_handle, instance_slice) in instance_meta
+                .instance_slices
                 .iter()
-                .flat_map(|entity| query_instance_block.get(*entity))
+                .flat_map(|entity| query_instance_slice.get(*entity))
             {
-                debug!("Instance block {entity:?}");
+                debug!("Instance slice {entity:?}");
                 let mesh = render_meshes.get(mesh_handle).unwrap();
                 let mesh_key = mesh.key.clone();
 
@@ -140,19 +139,19 @@ pub fn system<M: MaterialInstanced>(
                     material_key,
                 };
 
-                keyed_instance_blocks.entry(key).or_default().push((
+                keyed_instance_slices.entry(key).or_default().push((
                     entity,
                     material_handle,
-                    instance_block,
+                    instance_slice,
                 ));
             }
 
-            keyed_instance_blocks
+            keyed_instance_slices
         });
 
         debug!(
-            "Keyed instance blocks: {:#?}",
-            keyed_instance_blocks.values()
+            "Keyed instance slices: {:#?}",
+            keyed_instance_slices.values()
         );
 
         // Create an instance buffer vec for each key
@@ -189,50 +188,50 @@ pub fn system<M: MaterialInstanced>(
             }
         });
 
-        let span = bevy::prelude::info_span!("Create instance block ranges");
-        let mut keyed_instance_block_ranges = span.in_scope(|| {
-            debug!("Creating instance block ranges");
-            // Create instance block ranges
-            keyed_instance_blocks
+        let span = bevy::prelude::info_span!("Create instance slice ranges");
+        let mut keyed_instance_slice_ranges = span.in_scope(|| {
+            debug!("Creating instance slice ranges");
+            // Create instance slice ranges
+            keyed_instance_slices
                 .iter()
-                .map(|(key, instance_blocks)| {
+                .map(|(key, instance_slices)| {
                     let instance_buffer_data_len = keyed_instance_buffer_data
                         .get(&key)
                         .map(GpuInstances::len)
                         .unwrap_or_default();
 
-                    // Collect CPU instance block data
+                    // Collect CPU instance slice data
                     let mut offset = instance_buffer_data_len;
-                    let mut instance_block_ranges = BTreeMap::<Entity, InstanceBlockRange>::new();
-                    for (entity, _, instance_block) in instance_blocks {
-                        debug!("Generating InstanceBlockRange for {entity:?}");
-                        // Generate instance block range
-                        instance_block_ranges.insert(
+                    let mut instance_slice_ranges = BTreeMap::<Entity, InstanceSliceRange>::new();
+                    for (entity, _, instance_slice) in instance_slices {
+                        debug!("Generating InstanceSliceRange for {entity:?}");
+                        // Generate instance slice range
+                        instance_slice_ranges.insert(
                             *entity,
-                            InstanceBlockRange {
+                            InstanceSliceRange {
                                 offset: offset as u64,
-                                instance_count: instance_block.instance_count as u64,
+                                instance_count: instance_slice.instance_count as u64,
                             },
                         );
 
-                        offset += instance_block.instance_count;
+                        offset += instance_slice.instance_count;
                     }
 
-                    debug!("Instance block ranges: {instance_block_ranges:?}");
+                    debug!("Instance slice ranges: {instance_slice_ranges:?}");
 
-                    (key.clone(), instance_block_ranges)
+                    (key.clone(), instance_slice_ranges)
                 })
                 .collect::<BTreeMap<_, _>>()
         });
 
-        let span = bevy::prelude::info_span!("Populate instance blocks");
+        let span = bevy::prelude::info_span!("Populate instance slices");
         span.in_scope(|| {
-            // Populate instance blocks
-            for (key, instance_blocks) in keyed_instance_blocks.iter() {
+            // Populate instance slices
+            for (key, instance_slices) in keyed_instance_slices.iter() {
                 // Collect instance data
-                let instance_count: usize = instance_blocks
+                let instance_count: usize = instance_slices
                     .iter()
-                    .map(|(_, _, instance_block)| instance_block.instance_count)
+                    .map(|(_, _, instance_slice)| instance_slice.instance_count)
                     .sum();
 
                 let entry = keyed_instance_buffer_data
@@ -259,14 +258,14 @@ pub fn system<M: MaterialInstanced>(
                             })
                             .unwrap_or_default();
 
-                        let instance_block_ranges =
-                            keyed_instance_block_ranges.remove(&key).unwrap_or_default();
+                        let instance_slice_ranges =
+                            keyed_instance_slice_ranges.remove(&key).unwrap_or_default();
 
                         (
                             key.clone(),
                             InstanceBatch::<M> {
                                 instances,
-                                instance_block_ranges,
+                                instance_slice_ranges,
                                 instance_buffer_data,
                             },
                         )

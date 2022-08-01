@@ -1,21 +1,21 @@
-pub mod instance_block_bundle;
+pub mod instance_slice_bundle;
 
 use bevy::{
     ecs::{reflect::ReflectComponent, system::lifetimeless::Read},
-    prelude::{Component},
+    prelude::Component,
     reflect::Reflect,
     render::{extract_component::ExtractComponent, render_resource::Buffer},
 };
 
-/// Allocates a contiguous block of the instance buffer corresponding to a given material
+/// Allocates a contiguous slice of the instance buffer corresponding to a given mesh and material
 /// Used to reserve space for compute-driven instances
 #[derive(Debug, Default, Copy, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub struct InstanceBlock {
+pub struct InstanceSlice {
     pub instance_count: usize,
 }
 
-impl ExtractComponent for InstanceBlock {
+impl ExtractComponent for InstanceSlice {
     type Query = Read<Self>;
 
     type Filter = ();
@@ -26,12 +26,12 @@ impl ExtractComponent for InstanceBlock {
 }
 
 #[derive(Debug, Copy, Clone, Component)]
-pub struct InstanceBlockRange {
+pub struct InstanceSliceRange {
     pub offset: u64,
     pub instance_count: u64,
 }
 
 #[derive(Debug, Clone, Component)]
-pub struct InstanceBlockBuffer {
+pub struct InstanceSliceTarget {
     pub buffer: Buffer,
 }

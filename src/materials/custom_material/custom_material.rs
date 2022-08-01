@@ -1,14 +1,13 @@
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     pbr::AlphaMode,
-    prelude::{default, AssetServer, Handle, Shader},
+    prelude::{default, AssetServer},
     reflect::TypeUuid,
     render::{
         mesh::MeshVertexBufferLayout,
         render_asset::{PrepareAssetError, RenderAsset},
         render_resource::{
-            AsBindGroup, BindGroup, BindGroupDescriptor, BindGroupLayout,
-            BindGroupLayoutDescriptor, Face, RenderPipelineDescriptor,
+            AsBindGroup, BindGroup, BindGroupDescriptor, Face, RenderPipelineDescriptor, ShaderRef,
             SpecializedMeshPipelineError,
         },
         renderer::RenderDevice,
@@ -108,12 +107,12 @@ impl AsBatch for CustomMaterial {
 impl MaterialInstanced for CustomMaterial {
     type Instance = ColorMeshInstance;
 
-    fn vertex_shader(_: &AssetServer) -> Option<Handle<Shader>> {
-        Some(CUSTOM_SHADER_HANDLE.typed::<Shader>())
+    fn vertex_shader(_: &AssetServer) -> ShaderRef {
+        CUSTOM_SHADER_HANDLE.typed().into()
     }
 
-    fn fragment_shader(_: &AssetServer) -> Option<Handle<Shader>> {
-        Some(CUSTOM_SHADER_HANDLE.typed::<Shader>())
+    fn fragment_shader(_: &AssetServer) -> ShaderRef {
+        CUSTOM_SHADER_HANDLE.typed().into()
     }
 
     fn specialize(

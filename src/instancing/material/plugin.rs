@@ -42,7 +42,7 @@ use bevy::{
 };
 
 use crate::prelude::{
-    extract_mesh_instances, Instance, InstanceBlockRange, InstancedMaterialPipeline,
+    extract_mesh_instances, Instance, InstanceSliceRange, InstancedMaterialPipeline,
     MaterialInstanced, SetInstancedMaterialBindGroup, SetInstancedMeshBindGroup,
 };
 
@@ -57,7 +57,7 @@ use std::marker::PhantomData;
 use super::systems::{
     extract_instanced_meshes, prepare_batched_instances, prepare_instance_batches,
     prepare_instanced_view_meta, prepare_material_batches, prepare_mesh_batches,
-    prepare_view_instance_blocks, prepare_view_instances, queue_instanced_materials,
+    prepare_view_instance_slices, prepare_view_instances, queue_instanced_materials,
 };
 
 /// Adds the necessary ECS resources and render logic to enable rendering entities using the given [`SpecializedMaterial`]
@@ -98,7 +98,7 @@ where
                     RenderStage::Prepare,
                     prepare_instanced_view_meta::system::<M>
                         .before(prepare_view_instances::system::<M>)
-                        .before(prepare_view_instance_blocks::system::<M>),
+                        .before(prepare_view_instance_slices::system::<M>),
                 )
                 .add_system_to_stage(
                     RenderStage::Prepare,
@@ -106,7 +106,7 @@ where
                 )
                 .add_system_to_stage(
                     RenderStage::Prepare,
-                    prepare_view_instance_blocks::system::<M>
+                    prepare_view_instance_slices::system::<M>
                         .before(PrepareAssetLabel::AssetPrepare),
                 )
                 .add_system_to_stage(
@@ -469,7 +469,7 @@ impl<M: MaterialInstanced> GpuInstances<M> {
 
 pub struct InstanceBatch<M: MaterialInstanced> {
     pub instances: BTreeSet<Entity>,
-    pub instance_block_ranges: BTreeMap<Entity, InstanceBlockRange>,
+    pub instance_slice_ranges: BTreeMap<Entity, InstanceSliceRange>,
     pub instance_buffer_data: GpuInstances<M>,
 }
 
@@ -477,7 +477,7 @@ impl<M: MaterialInstanced> Debug for InstanceBatch<M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InstanceBatch")
             .field("instances", &self.instances)
-            .field("instance_block_ranges", &self.instance_block_ranges)
+            .field("instance_slice_ranges", &self.instance_slice_ranges)
             .finish()
     }
 }
@@ -515,7 +515,7 @@ where
 /// Resource containing instance batches
 pub struct InstanceMeta<M: MaterialInstanced> {
     pub instances: Vec<Entity>,
-    pub instance_blocks: Vec<Entity>,
+    pub instance_slices: Vec<Entity>,
     pub mesh_batches: BTreeMap<InstancedMeshKey, MeshBatch>,
     pub material_batches: BTreeMap<InstancedMaterialBatchKey<M>, MaterialBatch<M>>,
     pub instance_batches: BTreeMap<InstanceBatchKey<M>, InstanceBatch<M>>,
@@ -526,7 +526,7 @@ impl<M: MaterialInstanced> Default for InstanceMeta<M> {
     fn default() -> Self {
         Self {
             instances: default(),
-            instance_blocks: default(),
+            instance_slices: default(),
             mesh_batches: default(),
             material_batches: default(),
             instance_batches: default(),

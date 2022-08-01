@@ -1,10 +1,10 @@
-use bevy::asset::{AssetServer, Handle};
+use bevy::asset::AssetServer;
 use bevy::pbr::AlphaMode;
 use bevy::reflect::TypeUuid;
-use bevy::render::render_resource::AsBindGroup;
+use bevy::render::render_resource::{AsBindGroup, ShaderRef};
 use bevy::render::{
     mesh::MeshVertexBufferLayout,
-    render_resource::{RenderPipelineDescriptor, Shader, SpecializedMeshPipelineError},
+    render_resource::{RenderPipelineDescriptor, SpecializedMeshPipelineError},
 };
 
 use crate::prelude::{Instance, InstancedMaterialPipeline};
@@ -27,15 +27,15 @@ pub trait MaterialInstanced:
     /// Returns this material's vertex shader. If [`None`] is returned, the default mesh vertex shader will be used.
     /// Defaults to [`None`].
     #[allow(unused_variables)]
-    fn vertex_shader(asset_server: &AssetServer) -> Option<Handle<Shader>> {
-        None
+    fn vertex_shader(asset_server: &AssetServer) -> ShaderRef {
+        ShaderRef::Default
     }
 
     /// Returns this material's fragment shader. If [`None`] is returned, the default mesh fragment shader will be used.
     /// Defaults to [`None`].
     #[allow(unused_variables)]
-    fn fragment_shader(asset_server: &AssetServer) -> Option<Handle<Shader>> {
-        None
+    fn fragment_shader(asset_server: &AssetServer) -> ShaderRef {
+        ShaderRef::Default
     }
 
     /// Returns this material's [`AlphaMode`]. Defaults to [`AlphaMode::Opaque`].

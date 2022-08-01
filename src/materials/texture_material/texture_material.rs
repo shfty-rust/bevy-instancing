@@ -1,14 +1,14 @@
 use bevy::{
     ecs::system::{lifetimeless::SRes, SystemParamItem},
     pbr::AlphaMode,
-    prelude::{default, AssetServer, Handle, Image, Shader},
+    prelude::{default, AssetServer, Handle, Image},
     reflect::TypeUuid,
     render::{
         mesh::MeshVertexBufferLayout,
         render_asset::{PrepareAssetError, RenderAsset, RenderAssets},
         render_resource::{
             AsBindGroup, BindGroup, BindGroupDescriptor, BindGroupEntry, BindingResource, Face,
-            RenderPipelineDescriptor, SpecializedMeshPipelineError,
+            RenderPipelineDescriptor, ShaderRef, SpecializedMeshPipelineError,
         },
         renderer::RenderDevice,
     },
@@ -171,12 +171,12 @@ impl AsBatch for TextureMaterial {
 impl MaterialInstanced for TextureMaterial {
     type Instance = ColorMeshInstance;
 
-    fn vertex_shader(_: &AssetServer) -> Option<Handle<Shader>> {
-        Some(TEXTURE_SHADER_HANDLE.typed::<Shader>())
+    fn vertex_shader(_: &AssetServer) -> ShaderRef {
+        TEXTURE_SHADER_HANDLE.typed().into()
     }
 
-    fn fragment_shader(_: &AssetServer) -> Option<Handle<Shader>> {
-        Some(TEXTURE_SHADER_HANDLE.typed::<Shader>())
+    fn fragment_shader(_: &AssetServer) -> ShaderRef {
+        TEXTURE_SHADER_HANDLE.typed().into()
     }
 
     fn specialize(

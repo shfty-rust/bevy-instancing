@@ -5,7 +5,7 @@ use bevy::{
     render::{RenderApp, extract_component::ExtractComponentPlugin},
 };
 
-use crate::prelude::{InstanceBlock, InstancedMeshPipeline};
+use crate::prelude::{InstanceSlice, InstancedMeshPipeline};
 
 pub const INSTANCED_MESH_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 7051817732463169032);
@@ -43,9 +43,9 @@ impl Plugin for IndirectRenderingPlugin {
             Shader::from_wgsl
         );
 
-        app.register_type::<InstanceBlock>();
+        app.register_type::<InstanceSlice>();
 
-        app.add_plugin(ExtractComponentPlugin::<InstanceBlock>::default());
+        app.add_plugin(ExtractComponentPlugin::<InstanceSlice>::default());
 
         app.sub_app_mut(RenderApp)
             .init_resource::<InstancedMeshPipeline>();

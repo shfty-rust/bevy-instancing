@@ -6,7 +6,7 @@ use bevy::{
 };
 
 use crate::instancing::{
-    instance_block::InstanceBlock,
+    instance_slice::InstanceSlice,
     material::{
         plugin::{
             GpuAlphaMode, InstanceViewMeta, InstancedMaterialBatchKey, MaterialBatch,
@@ -26,7 +26,7 @@ pub fn system<M: MaterialInstanced>(
         &Handle<M>,
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
-    query_instance_block: Query<(Entity, &Handle<M>, &InstanceBlock)>,
+    query_instance_slice: Query<(Entity, &Handle<M>, &InstanceSlice)>,
 ) where
     M::Data: Debug + Clone,
 {
@@ -44,9 +44,9 @@ pub fn system<M: MaterialInstanced>(
             .map(|(_, material, _)| material.clone_weak())
             .chain(
                 instance_meta
-                    .instance_blocks
+                    .instance_slices
                     .iter()
-                    .flat_map(|entity| query_instance_block.get(*entity))
+                    .flat_map(|entity| query_instance_slice.get(*entity))
                     .map(|(_, material, _)| material.clone_weak()),
             )
             .collect::<BTreeSet<_>>();

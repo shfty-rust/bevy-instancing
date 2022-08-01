@@ -1,4 +1,4 @@
-//! Demonstration of InstanceBlock compute functionality
+//! Demonstration of InstanceSlice compute functionality
 //!
 //! Also highlights alpha ordering behaviour for transparent instance blocks;
 //! batch order is visible when instances from different blocks draw on top
@@ -40,7 +40,7 @@ use bevy::{
 
 use bevy_instancing::prelude::{
     CustomMaterial, CustomMaterialPlugin, GpuColorMeshInstance, IndirectRenderingPlugin,
-    InstanceBlock, InstanceBlockBuffer, InstanceBlockBundle, InstanceBlockRange,
+    InstanceSlice, InstanceSliceTarget, InstanceSliceBundle, InstanceSliceRange,
     MaterialInstanced,
 };
 use bytemuck::{Pod, Zeroable};
@@ -220,8 +220,8 @@ pub fn queue_compute_instances<M: MaterialInstanced>(
         (
             Entity,
             &InstanceComputeUniform,
-            &InstanceBlockRange,
-            &InstanceBlockBuffer,
+            &InstanceSliceRange,
+            &InstanceSliceTarget,
         ),
         With<Handle<M>>,
     >,
@@ -351,10 +351,10 @@ fn setup_instancing(
     commands
         .spawn()
         .insert(Name::new("Back Face Cube Instance Block"))
-        .insert_bundle(InstanceBlockBundle {
+        .insert_bundle(InstanceSliceBundle {
             material: material_back.clone(),
             mesh: mesh_cube.clone(),
-            mesh_instance_block: InstanceBlock {
+            mesh_instance_slice: InstanceSlice {
                 instance_count: 200,
             },
             ..default()
@@ -369,10 +369,10 @@ fn setup_instancing(
     commands
         .spawn()
         .insert(Name::new("Front Face Cube Instance Block"))
-        .insert_bundle(InstanceBlockBundle {
+        .insert_bundle(InstanceSliceBundle {
             material: material_front.clone(),
             mesh: mesh_cube.clone(),
-            mesh_instance_block: InstanceBlock {
+            mesh_instance_slice: InstanceSlice {
                 instance_count: 200,
             },
             ..default()
@@ -387,10 +387,10 @@ fn setup_instancing(
     commands
         .spawn()
         .insert(Name::new("Back Face Sphere Instance Block"))
-        .insert_bundle(InstanceBlockBundle {
+        .insert_bundle(InstanceSliceBundle {
             material: material_back.clone(),
             mesh: mesh_sphere.clone(),
-            mesh_instance_block: InstanceBlock {
+            mesh_instance_slice: InstanceSlice {
                 instance_count: 200,
             },
             ..default()
@@ -405,10 +405,10 @@ fn setup_instancing(
     commands
         .spawn()
         .insert(Name::new("Front Face Sphere Instance Block"))
-        .insert_bundle(InstanceBlockBundle {
+        .insert_bundle(InstanceSliceBundle {
             material: material_front.clone(),
             mesh: mesh_sphere.clone(),
-            mesh_instance_block: InstanceBlock {
+            mesh_instance_slice: InstanceSlice {
                 instance_count: 200,
             },
             ..default()

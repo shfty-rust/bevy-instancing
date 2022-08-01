@@ -10,7 +10,7 @@ use bevy::{
 use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
 
 use crate::instancing::{
-    instance_block::InstanceBlock,
+    instance_slice::InstanceSlice,
     material::{
         plugin::{
             GpuIndexBufferData, GpuIndirectData, GpuInstancedMeshes, InstanceViewMeta,
@@ -31,7 +31,7 @@ pub fn system<M: MaterialInstanced>(
         &Handle<Mesh>,
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
-    query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
+    query_instance_slice: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceSlice)>,
 ) {
     debug!("{}", std::any::type_name::<M>());
 
@@ -49,11 +49,11 @@ pub fn system<M: MaterialInstanced>(
             .map(|(_, _, mesh, _)| mesh.clone_weak())
             .chain(
                 instance_meta
-                    .instance_blocks
+                    .instance_slices
                     .iter()
                     .flat_map(|entity| {
-                        debug!("Instance block {entity:?}");
-                        query_instance_block.get(*entity)
+                        debug!("Instance slice {entity:?}");
+                        query_instance_slice.get(*entity)
                     })
                     .map(|(_, _, mesh, _)| {
                         debug!("Mesh: {mesh:?}");

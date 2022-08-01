@@ -12,7 +12,7 @@ use bevy::{
 use wgpu::{util::BufferInitDescriptor, BindGroupDescriptor, BindGroupEntry, BufferUsages};
 
 use crate::instancing::{
-    instance_block::{InstanceBlock, InstanceBlockBuffer},
+    instance_slice::{InstanceSlice, InstanceSliceTarget},
     material::{
         instanced_material_pipeline::InstancedMaterialPipeline,
         plugin::{
@@ -38,7 +38,7 @@ pub fn system<M: MaterialInstanced>(
         &Handle<Mesh>,
         &<M::Instance as Instance>::ExtractedInstance,
     )>,
-    query_instance_block: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceBlock)>,
+    query_instance_slice: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceSlice)>,
     mut query_views: Query<Entity, (With<ExtractedView>, With<VisibleEntities>)>,
     mut commands: Commands,
 ) {
@@ -78,13 +78,13 @@ pub fn system<M: MaterialInstanced>(
                 *mesh_instance_counts.get_mut(mesh).unwrap() += 1;
             }
 
-            for (mesh, instance_block) in instance_batch
-                .instance_block_ranges
+            for (mesh, instance_slice) in instance_batch
+                .instance_slice_ranges
                 .iter()
-                .flat_map(|(entity, _)| query_instance_block.get(*entity))
-                .map(|(_, _, mesh, instance_block)| (mesh, instance_block))
+                .flat_map(|(entity, _)| query_instance_slice.get(*entity))
+                .map(|(_, _, mesh, instance_slice)| (mesh, instance_slice))
             {
-                *mesh_instance_counts.get_mut(mesh).unwrap() += instance_block.instance_count;
+                *mesh_instance_counts.get_mut(mesh).unwrap() += instance_slice.instance_count;
             }
 
             debug!("Mesh instance counts: {mesh_instance_counts:?}");
@@ -231,12 +231,12 @@ pub fn system<M: MaterialInstanced>(
                 }],
             });
 
-            // Insert instance block data
-            for (entity, block_range) in instance_batch.instance_block_ranges.iter() {
+            // Insert instance slice data
+            for (entity, slice_range) in instance_batch.instance_slice_ranges.iter() {
                 commands
                     .entity(*entity)
-                    .insert(*block_range)
-                    .insert(InstanceBlockBuffer {
+                    .insert(*slice_range)
+                    .insert(InstanceSliceTarget {
                         buffer: instance_batch
                             .instance_buffer_data
                             .buffer()
