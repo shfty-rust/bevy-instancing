@@ -1,3 +1,5 @@
+TODO: Refactor pass to bring instancing pipeline in-line with 0.8 patterns
+
 TODO: Optimization pass for instanced mesh batcher
 
 TODO: Use BufferVec to cache batch data inside InstanceMeta
@@ -17,6 +19,14 @@ TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances
         * Should be able to encode most StandardMaterial params as instance data
       * Secondary goal: Make shadows work
+
+FIXME: Instance buffer layout is incorrect under wasm
+       * Instances draw, but with incorrect positions
+       * Instance buffer appears to be excessively padded
+         * Manually drawing instances 0..64 for each indirect reveals that all the transform data is there,
+           but at 10-instance-wide intervals instead of the expected 1-instance-wide
+         * Experimented with explicitly specifying struct size and alignment, but makes no difference
+         * Likely some unaccounted-for wgpu feature or limit
 
 NOTES: Transparency ordering
       * Currently, transparency ordering is only correct versus other instances with the
