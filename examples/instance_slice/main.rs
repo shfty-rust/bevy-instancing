@@ -6,13 +6,10 @@
 //!
 
 use std::borrow::Cow;
-use std::marker::PhantomData;
 use std::num::NonZeroU64;
 
 use bevy::ecs::system::lifetimeless::Read;
-use bevy::prelude::{
-    debug, Camera3dBundle, Component, Entity, FromWorld, Handle, Query, Res, With, World,
-};
+use bevy::prelude::{debug, Camera3dBundle, Component, Entity, FromWorld, Query, Res, World};
 use bevy::reflect::TypeUuid;
 use bevy::render::extract_component::{ExtractComponent, ExtractComponentPlugin};
 use bevy::render::render_graph::{Node, NodeLabel, RenderGraph};
@@ -40,8 +37,7 @@ use bevy::{
 
 use bevy_instancing::prelude::{
     CustomMaterial, CustomMaterialPlugin, GpuColorMeshInstance, IndirectRenderingPlugin,
-    InstanceSlice, InstanceSliceTarget, InstanceSliceBundle, InstanceSliceRange,
-    MaterialInstanced,
+    InstanceSlice, InstanceSliceBundle, InstanceSliceRange, InstanceSliceTarget,
 };
 use bytemuck::{Pod, Zeroable};
 
@@ -52,7 +48,7 @@ fn main() {
     app.add_plugins(DefaultPlugins)
         .add_plugin(IndirectRenderingPlugin)
         .add_plugin(CustomMaterialPlugin)
-        .add_plugin(InstanceComputePlugin::<CustomMaterial>::default());
+        .add_plugin(InstanceComputePlugin::default());
 
     app.add_startup_system(setup_instancing);
 
@@ -77,15 +73,10 @@ impl Into<NodeLabel> for InstanceCompute {
     }
 }
 
-struct InstanceComputePlugin<M: MaterialInstanced>(PhantomData<M>);
+#[derive(Debug, Default, Copy, Clone)]
+struct InstanceComputePlugin;
 
-impl<M: MaterialInstanced> Default for InstanceComputePlugin<M> {
-    fn default() -> Self {
-        Self(default())
-    }
-}
-
-impl<M: MaterialInstanced> Plugin for InstanceComputePlugin<M> {
+impl Plugin for InstanceComputePlugin {
     fn build(&self, app: &mut App) {
         load_internal_asset!(
             app,
@@ -99,7 +90,7 @@ impl<M: MaterialInstanced> Plugin for InstanceComputePlugin<M> {
         let render_app = app.sub_app_mut(RenderApp);
         render_app
             .init_resource::<InstanceComputePipeline>()
-            .add_system_to_stage(RenderStage::Queue, queue_compute_instances::<M>);
+            .add_system_to_stage(RenderStage::Queue, queue_compute_instances);
 
         let mut render_graph = render_app.world.resource_mut::<RenderGraph>();
         render_graph.add_node(InstanceCompute, InstanceComputeNode);
@@ -213,21 +204,18 @@ impl Node for InstanceComputeNode {
     }
 }
 
-pub fn queue_compute_instances<M: MaterialInstanced>(
+pub fn queue_compute_instances(
     pipeline: Res<InstanceComputePipeline>,
     render_device: Res<RenderDevice>,
-    query_instance_block: Query<
-        (
-            Entity,
-            &InstanceComputeUniform,
-            &InstanceSliceRange,
-            &InstanceSliceTarget,
-        ),
-        With<Handle<M>>,
-    >,
+    query_instance_block: Query<(
+        Entity,
+        &InstanceComputeUniform,
+        &InstanceSliceRange,
+        &InstanceSliceTarget,
+    )>,
     mut commands: Commands,
 ) {
-    debug!("queue_compute_instances::<{}>", std::any::type_name::<M>());
+    debug!("queue_compute_instances");
     let mut instance_compute_queue = vec![];
 
     for (
