@@ -7,7 +7,6 @@
 
 use bevy::ecs::system::lifetimeless::Read;
 use bevy::prelude::{Camera3dBundle, Component, Query, Res};
-use bevy::reflect::TypeUuid;
 use bevy::render::extract_component::ExtractComponent;
 use bevy::render::render_resource::{AsBindGroup, Face, ShaderRef};
 use bevy::time::Time;
@@ -46,7 +45,6 @@ fn main() {
 }
 
 #[derive(Debug, Default, Copy, Clone, Component, AsBindGroup)]
-#[repr(C)]
 pub struct RadialSineInstances {
     #[uniform(0)]
     time: f32,

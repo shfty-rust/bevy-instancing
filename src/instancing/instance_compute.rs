@@ -2,8 +2,6 @@ use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::{borrow::Cow, hash::Hash};
 
-use bevy::prelude::{debug, Handle};
-use bevy::render::render_resource::CachedComputePipelineId;
 use bevy::{
     asset::load_internal_asset,
     prelude::{
@@ -27,6 +25,7 @@ use bevy::{
         RenderApp, RenderStage,
     },
 };
+use bevy::{prelude::Handle, render::render_resource::CachedComputePipelineId};
 
 use crate::prelude::{InstanceSliceRange, InstanceSliceTarget};
 

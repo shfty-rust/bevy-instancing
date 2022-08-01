@@ -1,4 +1,6 @@
-TODO: Refactor pass to bring instancing pipeline in-line with 0.8 patterns
+TODO: Account for uniform buffer size limits
+      * Currently only binding one set of UNIFORM_MAX_INSTANCES-length instances
+      * Need to split instance batches by max size, spread across extra draw calls
 
 TODO: Optimization pass for instanced mesh batcher
 
@@ -8,12 +10,6 @@ TODO: Use BufferVec to cache batch data inside InstanceMeta
       * Should be able to avoid unnecessary writes on frames where the
         buffer data for a given key doesn't change
         * Seems important, since the act of writing data to the GPU is what indirect avoids
-
-TODO: Specialization for compute shaders that operate on a MeshInstanceBlock
-      * Effectively a generalization of the current board compute module
-      * Should resemble SpecializedInstancedMaterial
-      * InstanceComputeKernel?
-      * SpecializedComputePipeline is worth investigating; may be able to leverage
 
 TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances

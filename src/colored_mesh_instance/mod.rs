@@ -17,7 +17,6 @@ pub struct ColorMeshInstance {
 
 /// GPU-friendly data for a since mesh instance
 #[derive(Debug, Copy, Clone, PartialEq, ShaderType, Component)]
-#[repr(C)]
 pub struct GpuColorMeshInstance {
     #[size(144)]
     #[align(16)]

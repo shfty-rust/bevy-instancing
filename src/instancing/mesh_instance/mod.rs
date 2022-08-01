@@ -20,7 +20,6 @@ pub struct MeshInstance {
 }
 
 #[derive(Debug, Copy, Clone, ShaderType, Component)]
-#[repr(C)]
 pub struct GpuMeshInstance {
     #[size(4)]
     #[align(16)]
