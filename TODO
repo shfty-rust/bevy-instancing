@@ -1,3 +1,6 @@
+TODO: Specialized binding example for instance compute
+      * Double-buffer instances for 3D boids
+
 TODO: Account for uniform buffer size limits
       * Currently only binding one set of UNIFORM_MAX_INSTANCES-length instances
       * Need to split instance batches by max size, spread across extra draw calls
