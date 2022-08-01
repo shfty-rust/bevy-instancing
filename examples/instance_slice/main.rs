@@ -17,7 +17,7 @@ use bevy::render::render_resource::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, BufferBinding, BufferBindingType,
     BufferInitDescriptor, BufferUsages, CachedComputePipelineId, ComputePassDescriptor,
-    ComputePipelineDescriptor, Face, PipelineCache, ShaderStages,
+    ComputePipelineDescriptor, Face, PipelineCache, ShaderStages, 
 };
 use bevy::render::renderer::RenderDevice;
 use bevy::render::{RenderApp, RenderStage};

@@ -5,7 +5,7 @@ use bevy::{
 
 use crate::instancing::{
     instance_slice::InstanceSlice,
-    material::{plugin::InstanceViewMeta, specialized_instanced_material::MaterialInstanced},
+    material::{plugin::InstanceViewMeta, material_instanced::MaterialInstanced},
 };
 
 pub fn system<M: MaterialInstanced>(

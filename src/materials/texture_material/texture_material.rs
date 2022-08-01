@@ -15,7 +15,7 @@ use bevy::{
 };
 
 use crate::{
-    instancing::material::specialized_instanced_material::AsBatch,
+    instancing::material::material_instanced::AsBatch,
     prelude::{ColorMeshInstance, InstancedMaterialPipeline, MaterialInstanced},
 };
 

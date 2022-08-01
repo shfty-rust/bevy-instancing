@@ -11,7 +11,7 @@ use bevy::{
 };
 use crate::prelude::Instance;
 
-use super::material::specialized_instanced_material::MaterialInstanced;
+use super::material::material_instanced::MaterialInstanced;
 
 #[derive(Debug, Default, Clone, PartialEq, Component)]
 pub struct MeshInstance {

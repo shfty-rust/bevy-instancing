@@ -7,7 +7,7 @@ use bevy::{
 
 use crate::instancing::material::{
     plugin::{GpuIndexBufferData, GpuInstancedMesh, GpuInstancedMeshes, InstancedMeshKey},
-    specialized_instanced_material::MaterialInstanced,
+    material_instanced::MaterialInstanced,
 };
 
 pub fn system<M: MaterialInstanced>(

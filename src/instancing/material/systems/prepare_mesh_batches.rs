@@ -16,7 +16,7 @@ use crate::instancing::{
             GpuIndexBufferData, GpuIndirectData, GpuInstancedMeshes, InstanceViewMeta,
             InstancedMeshKey, MeshBatch,
         },
-        specialized_instanced_material::MaterialInstanced,
+        material_instanced::MaterialInstanced,
     },
     render::instance::Instance,
 };

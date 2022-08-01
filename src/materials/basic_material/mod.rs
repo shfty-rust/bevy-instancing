@@ -14,7 +14,7 @@ use bevy::{
 };
 
 use crate::{
-    instancing::material::specialized_instanced_material::{AsBatch, MaterialInstanced},
+    instancing::material::material_instanced::{AsBatch, MaterialInstanced},
     prelude::{InstancedMaterialPipeline, MeshInstance},
 };
 

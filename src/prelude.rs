@@ -5,7 +5,7 @@ pub use crate::{
         instance_slice::{instance_slice_bundle::*, *},
         material::{
             instanced_material_pipeline::*, plugin::*,
-            set_instanced_material_bind_group::*, specialized_instanced_material::*, systems::*, *,
+            set_instanced_material_bind_group::*, material_instanced::*, systems::*, *,
         },
         mesh_instance::{mesh_instance_bundle::*, *},
         plugin::*,

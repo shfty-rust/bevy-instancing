@@ -12,7 +12,7 @@ use crate::instancing::{
             GpuAlphaMode, InstanceViewMeta, InstancedMaterialBatchKey, MaterialBatch,
             RenderMaterials,
         },
-        specialized_instanced_material::MaterialInstanced,
+        material_instanced::MaterialInstanced,
     },
     render::instance::Instance,
 };

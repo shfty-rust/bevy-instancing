@@ -1,6 +1,6 @@
 use bevy::prelude::Bundle;
 
-use crate::{prelude::{MeshInstanceBundle, InstanceColor}, instancing::material::specialized_instanced_material::MaterialInstanced};
+use crate::{prelude::{MeshInstanceBundle, InstanceColor}, instancing::material::material_instanced::MaterialInstanced};
 
 #[derive(Default, Bundle)]
 pub struct ColorInstanceBundle<M: MaterialInstanced> {

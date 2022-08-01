@@ -19,7 +19,7 @@ use crate::instancing::{
             BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
             GpuInstancedMeshes, InstanceBatchKey, InstanceViewMeta, MeshBatch,
         },
-        specialized_instanced_material::MaterialInstanced,
+        material_instanced::MaterialInstanced,
     },
     render::instance::Instance,
 };

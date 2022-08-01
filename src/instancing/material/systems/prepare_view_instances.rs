@@ -5,7 +5,7 @@ use bevy::{
 
 use crate::instancing::{
     material::{
-        plugin::InstanceViewMeta, specialized_instanced_material::MaterialInstanced,
+        plugin::InstanceViewMeta, material_instanced::MaterialInstanced,
     },
     render::instance::Instance,
 };

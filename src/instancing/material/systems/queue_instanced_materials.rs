@@ -13,7 +13,7 @@ use bevy::{
 use crate::instancing::material::{
     instanced_material_pipeline::{InstancedMaterialPipeline, InstancedMaterialPipelineKey},
     plugin::{DrawInstanced, GpuAlphaMode, InstanceViewMeta},
-    specialized_instanced_material::MaterialInstanced,
+    material_instanced::MaterialInstanced,
 };
 
 #[allow(clippy::too_many_arguments)]
