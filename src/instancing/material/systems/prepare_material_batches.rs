@@ -64,7 +64,7 @@ impl<M: MaterialInstanced> DerefMut for MaterialBatches<M> {
 pub fn system<M: MaterialInstanced>(
     render_materials: Res<RenderMaterials<M>>,
     mut material_batches: ResMut<MaterialBatches<M>>,
-    mut query_views: Query<
+    query_views: Query<
         (Entity, &mut InstanceMeta<M>),
         (With<ExtractedView>, With<VisibleEntities>),
     >,
