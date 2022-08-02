@@ -55,9 +55,10 @@ use std::{
 use std::marker::PhantomData;
 
 use super::systems::{
-    extract_instanced_meshes, prepare_batched_instances, prepare_instance_batches,
-    prepare_instanced_view_meta, prepare_material_batches, prepare_mesh_batches,
-    prepare_view_instance_slices, prepare_view_instances, queue_instanced_materials,
+    extract_instanced_meshes, extract_instanced_view_meta, prepare_batched_instances,
+    prepare_instance_batches, prepare_instance_slice_targets, prepare_material_batches,
+    prepare_mesh_batches, prepare_view_instance_slices, prepare_view_instances,
+    queue_instanced_materials,
 };
 
 /// Adds the necessary ECS resources and render logic to enable rendering entities using the given [`SpecializedMaterial`]
@@ -85,21 +86,19 @@ where
                 .add_render_command::<Transparent3d, DrawInstanced<M>>()
                 .add_render_command::<Opaque3d, DrawInstanced<M>>()
                 .add_render_command::<AlphaMask3d, DrawInstanced<M>>()
-                .init_resource::<InstanceViewMeta<M>>()
                 .init_resource::<InstancedMaterialPipeline<M>>()
                 .init_resource::<ExtractedMaterials<M>>()
+                .init_resource::<RenderMeshes>()
                 .init_resource::<RenderMaterials<M>>()
                 .init_resource::<SpecializedMeshPipelines<InstancedMaterialPipeline<M>>>()
                 .add_system_to_stage(RenderStage::Extract, extract_materials::<M>)
                 .add_system_to_stage(RenderStage::Extract, extract_mesh_instances::<M>)
-                .add_system_to_stage(RenderStage::Extract, extract_instanced_meshes::system::<M>)
-                .add_system_to_stage(RenderStage::Prepare, prepare_materials::<M>)
+                .add_system_to_stage(RenderStage::Extract, extract_instanced_meshes::system)
                 .add_system_to_stage(
-                    RenderStage::Prepare,
-                    prepare_instanced_view_meta::system::<M>
-                        .before(prepare_view_instances::system::<M>)
-                        .before(prepare_view_instance_slices::system::<M>),
+                    RenderStage::Extract,
+                    extract_instanced_view_meta::system::<M>,
                 )
+                .add_system_to_stage(RenderStage::Prepare, prepare_materials::<M>)
                 .add_system_to_stage(
                     RenderStage::Prepare,
                     prepare_view_instances::system::<M>.before(PrepareAssetLabel::AssetPrepare),
@@ -127,6 +126,11 @@ where
                     RenderStage::Prepare,
                     prepare_batched_instances::system::<M>
                         .after(prepare_instance_batches::system::<M>),
+                )
+                .add_system_to_stage(
+                    RenderStage::Prepare,
+                    prepare_instance_slice_targets::system::<M>
+                        .after(prepare_batched_instances::system::<M>),
                 )
                 .add_system_to_stage(RenderStage::Queue, queue_instanced_materials::system::<M>);
         }
@@ -188,17 +192,15 @@ pub enum GpuIndexBufferData {
     },
 }
 
-#[derive(Debug, Clone)]
-pub struct GpuInstancedMeshes<M: MaterialInstanced> {
+#[derive(Debug, Clone, Deref, DerefMut)]
+pub struct RenderMeshes {
     pub instanced_meshes: BTreeMap<Handle<Mesh>, GpuInstancedMesh>,
-    pub _phantom: PhantomData<M>,
 }
 
-impl<M: MaterialInstanced> Default for GpuInstancedMeshes<M> {
+impl Default for RenderMeshes {
     fn default() -> Self {
-        GpuInstancedMeshes {
+        RenderMeshes {
             instanced_meshes: default(),
-            _phantom: default(),
         }
     }
 }
@@ -482,19 +484,6 @@ impl<M: MaterialInstanced> Debug for InstanceBatch<M> {
     }
 }
 
-#[derive(Deref, DerefMut)]
-pub struct InstanceViewMeta<M: MaterialInstanced> {
-    pub view_meta: BTreeMap<Entity, InstanceMeta<M>>,
-}
-
-impl<M: MaterialInstanced> Default for InstanceViewMeta<M> {
-    fn default() -> Self {
-        Self {
-            view_meta: default(),
-        }
-    }
-}
-
 pub struct MaterialBatch<M: MaterialInstanced> {
     pub material: Handle<M>,
     pub pipeline_key: M::Data,
@@ -513,6 +502,7 @@ where
 }
 
 /// Resource containing instance batches
+#[derive(Component)]
 pub struct InstanceMeta<M: MaterialInstanced> {
     pub instances: Vec<Entity>,
     pub instance_slices: Vec<Entity>,
@@ -547,24 +537,31 @@ pub enum GpuIndirectBufferData {
 }
 
 impl GpuIndirectBufferData {
-    fn buffer(&self) -> Option<&Buffer> {
+    pub fn buffer(&self) -> Option<&Buffer> {
         match self {
             GpuIndirectBufferData::Indexed { buffer, .. } => buffer.buffer(),
             GpuIndirectBufferData::NonIndexed { buffer, .. } => buffer.buffer(),
         }
     }
 
-    fn indirects(&self) -> Option<&Vec<DrawIndirect>> {
+    pub fn indirects(&self) -> Option<&Vec<DrawIndirect>> {
         match self {
             GpuIndirectBufferData::NonIndexed { indirects, .. } => Some(indirects),
             _ => None,
         }
     }
 
-    fn indexed_indirects(&self) -> Option<&Vec<DrawIndexedIndirect>> {
+    pub fn indexed_indirects(&self) -> Option<&Vec<DrawIndexedIndirect>> {
         match self {
             GpuIndirectBufferData::Indexed { indirects, .. } => Some(indirects),
             _ => None,
+        }
+    }
+
+    pub fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) {
+        match self {
+            GpuIndirectBufferData::Indexed { buffer, .. } => buffer.write_buffer(device, &queue),
+            GpuIndirectBufferData::NonIndexed { buffer, .. } => buffer.write_buffer(device, queue),
         }
     }
 }
@@ -572,8 +569,6 @@ impl GpuIndirectBufferData {
 /// The data necessary to render one set of mutually compatible instances
 #[derive(Component)]
 pub struct BatchedInstances {
-    pub view_entity: Entity,
-    pub batch_entity: Entity,
     pub vertex_buffer: Buffer,
     pub index_data: Option<(Buffer, IndexFormat)>,
     pub indirect_buffer: GpuIndirectBufferData,
@@ -596,7 +591,7 @@ pub struct DrawBatchedInstances<M: MaterialInstanced>(PhantomData<M>);
 impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
     type Param = (
         SRes<RenderDevice>,
-        SRes<InstanceViewMeta<M>>,
+        SQuery<Read<InstanceMeta<M>>>,
         SQuery<Read<InstanceBatchKey<M>>>,
     );
     #[inline]
@@ -612,8 +607,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
     ) -> RenderCommandResult {
         debug!("DrawInstanceBatch {item:?}");
         let batched_instances = instance_meta
-            .into_inner()
-            .get(&view)
+            .get_inner(view)
             .unwrap()
             .batched_instances
             .get(query_instance_batch_key.get(item).unwrap())

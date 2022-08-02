@@ -9,8 +9,8 @@ use crate::instancing::{
     instance_slice::InstanceSlice,
     material::{
         plugin::{
-            GpuAlphaMode, InstanceViewMeta, InstancedMaterialBatchKey, MaterialBatch,
-            RenderMaterials,
+            GpuAlphaMode, InstancedMaterialBatchKey, MaterialBatch,
+            RenderMaterials, InstanceMeta,
         },
         material_instanced::MaterialInstanced,
     },
@@ -18,9 +18,8 @@ use crate::instancing::{
 };
 
 pub fn system<M: MaterialInstanced>(
-    mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
     render_materials: Res<RenderMaterials<M>>,
-    mut query_views: Query<Entity, (With<ExtractedView>, With<VisibleEntities>)>,
+    mut query_views: Query<(Entity, &mut InstanceMeta<M>), (With<ExtractedView>, With<VisibleEntities>)>,
     query_instance: Query<(
         Entity,
         &Handle<M>,
@@ -32,9 +31,8 @@ pub fn system<M: MaterialInstanced>(
 {
     debug!("{}", std::any::type_name::<M>());
 
-    for view_entity in query_views.iter_mut() {
+    for (view_entity, mut instance_meta) in query_views.iter_mut() {
         debug!("View {view_entity:?}");
-        let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
 
         // Collect set of visible materials
         let materials = instance_meta

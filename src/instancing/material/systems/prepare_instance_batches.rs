@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, info, Entity, Handle, Mesh, Query, Res, ResMut, With},
+    prelude::{debug, default, Entity, Handle, Mesh, Query, Res, With},
     render::{
         renderer::RenderDevice,
         view::{ExtractedView, VisibleEntities},
@@ -12,21 +12,20 @@ use bevy::{
 use crate::instancing::{
     instance_slice::{InstanceSlice, InstanceSliceRange},
     material::{
-        plugin::{
-            GpuAlphaMode, GpuInstancedMeshes, GpuInstances, InstanceBatch, InstanceBatchKey,
-            InstanceViewMeta, InstancedMaterialBatchKey, MeshBatch, RenderMaterials,
-        },
         material_instanced::MaterialInstanced,
+        plugin::{
+            GpuAlphaMode, RenderMeshes, GpuInstances, InstanceBatch, InstanceBatchKey,
+            InstanceMeta, InstancedMaterialBatchKey, MeshBatch, RenderMaterials,
+        },
     },
     render::instance::Instance,
 };
 
 pub fn system<M: MaterialInstanced>(
-    mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
     render_device: Res<RenderDevice>,
-    render_meshes: Res<GpuInstancedMeshes<M>>,
+    render_meshes: Res<RenderMeshes>,
     render_materials: Res<RenderMaterials<M>>,
-    mut query_views: Query<(Entity, &ExtractedView), With<VisibleEntities>>,
+    mut query_views: Query<(Entity, &ExtractedView, &mut InstanceMeta<M>), With<VisibleEntities>>,
     query_instance: Query<(
         Entity,
         &Handle<M>,
@@ -39,9 +38,8 @@ pub fn system<M: MaterialInstanced>(
 
     let render_meshes = &render_meshes.instanced_meshes;
 
-    for (view_entity, view) in query_views.iter_mut() {
+    for (view_entity, view, mut instance_meta) in query_views.iter_mut() {
         debug!("View {view_entity:?}");
-        let instance_meta = instance_view_meta.get_mut(&view_entity).unwrap();
 
         // Fetch view rangefinder for sorting
         let rangefinder = view.rangefinder3d();

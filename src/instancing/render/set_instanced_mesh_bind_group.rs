@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use bevy::{
     ecs::system::{
-        lifetimeless::{Read, SQuery, SRes},
+        lifetimeless::{Read, SQuery},
         SystemParamItem,
     },
     prelude::{debug, Entity},
@@ -12,21 +12,24 @@ use bevy::{
     },
 };
 
-use crate::prelude::{InstanceBatchKey, InstanceViewMeta, MaterialInstanced};
+use crate::{
+    instancing::material::plugin::InstanceMeta,
+    prelude::{InstanceBatchKey, MaterialInstanced},
+};
 
 use super::instance::Instance;
 
 /// Render command for drawing instanced meshes
-pub struct SetInstancedMeshBindGroup<M: MaterialInstanced, const I: usize>(
-    PhantomData<M>,
-);
+pub struct SetInstancedMeshBindGroup<M: MaterialInstanced, const I: usize>(PhantomData<M>);
 
-impl<M: MaterialInstanced, const I: usize> EntityRenderCommand
-    for SetInstancedMeshBindGroup<M, I>
+impl<M: MaterialInstanced, const I: usize> EntityRenderCommand for SetInstancedMeshBindGroup<M, I>
 where
     <M::Instance as Instance>::PreparedInstance: ShaderType,
 {
-    type Param = (SRes<InstanceViewMeta<M>>, SQuery<Read<InstanceBatchKey<M>>>);
+    type Param = (
+        SQuery<Read<InstanceMeta<M>>>,
+        SQuery<Read<InstanceBatchKey<M>>>,
+    );
     #[inline]
     fn render<'w>(
         view: Entity,
@@ -41,8 +44,7 @@ where
         );
 
         let batched_instances = instance_view_meta
-            .into_inner()
-            .get(&view)
+            .get_inner(view)
             .unwrap()
             .batched_instances
             .get(query_instance_batch_key.get(item).unwrap())

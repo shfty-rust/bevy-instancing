@@ -1,9 +1,10 @@
 pub mod extract_instanced_meshes;
+pub mod extract_instanced_view_meta;
 pub mod prepare_batched_instances;
 pub mod prepare_instance_batches;
-pub mod prepare_instanced_view_meta;
 pub mod prepare_material_batches;
 pub mod prepare_mesh_batches;
 pub mod prepare_view_instance_slices;
 pub mod prepare_view_instances;
 pub mod queue_instanced_materials;
+pub mod prepare_instance_slice_targets;

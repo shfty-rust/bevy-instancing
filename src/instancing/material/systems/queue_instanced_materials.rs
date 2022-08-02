@@ -3,17 +3,18 @@ use std::hash::Hash;
 use bevy::{
     core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
     pbr::MeshPipelineKey,
-    prelude::{debug, error, info, Msaa, Query, Res, ResMut},
+    prelude::{debug, error, info, Commands, Entity, Msaa, Query, Res, ResMut, With},
     render::{
         render_phase::{DrawFunctions, RenderPhase},
         render_resource::{PipelineCache, SpecializedMeshPipelines},
+        view::{ExtractedView, VisibleEntities},
     },
 };
 
 use crate::instancing::material::{
     instanced_material_pipeline::{InstancedMaterialPipeline, InstancedMaterialPipelineKey},
-    plugin::{DrawInstanced, GpuAlphaMode, InstanceViewMeta},
     material_instanced::MaterialInstanced,
+    plugin::{DrawInstanced, GpuAlphaMode, InstanceMeta},
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -25,20 +26,31 @@ pub fn system<M: MaterialInstanced>(
     msaa: Res<Msaa>,
     mut pipelines: ResMut<SpecializedMeshPipelines<InstancedMaterialPipeline<M>>>,
     mut pipeline_cache: ResMut<PipelineCache>,
-    instance_view_meta: ResMut<InstanceViewMeta<M>>,
+    query_view: Query<(Entity, &InstanceMeta<M>), (With<ExtractedView>, With<VisibleEntities>)>,
     mut query_opaque_3d: Query<&mut RenderPhase<Opaque3d>>,
     mut query_alpha_mask_3d: Query<&mut RenderPhase<AlphaMask3d>>,
     mut query_transparent_3d: Query<&mut RenderPhase<Transparent3d>>,
+    mut commands: Commands,
 ) where
     M::Data: Clone + Hash + PartialEq + Eq,
 {
     debug!("{}", std::any::type_name::<M>());
 
-    for (view_entity, instance_meta) in instance_view_meta.iter() {
+    for (view_entity, instance_meta) in query_view.iter() {
         debug!("\tView {view_entity:?}");
 
         for (key, batched_instances) in &instance_meta.batched_instances {
-            let batch_entity = batched_instances.batch_entity;
+            debug!("{key:#?}");
+
+            // Spawn entity
+            let material = instance_meta
+                .material_batches
+                .get(&key.material_key)
+                .unwrap()
+                .material
+                .clone_weak();
+
+            let batch_entity = commands.spawn().insert(material).insert(key.clone()).id();
 
             // Queue draw function
             let draw_function = match key.material_key.alpha_mode {
@@ -89,7 +101,7 @@ pub fn system<M: MaterialInstanced>(
             match key.material_key.alpha_mode {
                 GpuAlphaMode::Opaque => {
                     debug!("\t\tQueuing opaque instanced draw {batch_entity:?}");
-                    let mut opaque_phase = query_opaque_3d.get_mut(*view_entity).unwrap();
+                    let mut opaque_phase = query_opaque_3d.get_mut(view_entity).unwrap();
                     opaque_phase.add(Opaque3d {
                         entity: batch_entity,
                         draw_function,
@@ -99,7 +111,7 @@ pub fn system<M: MaterialInstanced>(
                 }
                 GpuAlphaMode::Mask => {
                     debug!("\t\tQueuing masked instanced draw {batch_entity:?}");
-                    let mut alpha_mask_phase = query_alpha_mask_3d.get_mut(*view_entity).unwrap();
+                    let mut alpha_mask_phase = query_alpha_mask_3d.get_mut(view_entity).unwrap();
                     alpha_mask_phase.add(AlphaMask3d {
                         entity: batch_entity,
                         draw_function,
@@ -109,7 +121,7 @@ pub fn system<M: MaterialInstanced>(
                 }
                 GpuAlphaMode::Blend => {
                     debug!("\t\tQueuing transparent instanced draw {batch_entity:?}");
-                    let mut transparent_phase = query_transparent_3d.get_mut(*view_entity).unwrap();
+                    let mut transparent_phase = query_transparent_3d.get_mut(view_entity).unwrap();
                     transparent_phase.add(Transparent3d {
                         entity: batch_entity,
                         draw_function,

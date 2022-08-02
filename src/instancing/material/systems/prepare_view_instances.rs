@@ -1,32 +1,29 @@
 use bevy::{
-    prelude::{info, Entity, Handle, Query, ResMut, With, debug},
+    prelude::{debug, Entity, Handle, Query, With},
     render::view::{ExtractedView, VisibleEntities},
 };
 
 use crate::instancing::{
-    material::{
-        plugin::InstanceViewMeta, material_instanced::MaterialInstanced,
-    },
+    material::{material_instanced::MaterialInstanced, plugin::InstanceMeta},
     render::instance::Instance,
 };
 
 pub fn system<M: MaterialInstanced>(
-    query_views: Query<(Entity, &VisibleEntities), With<ExtractedView>>,
+    mut query_views: Query<(Entity, &VisibleEntities, &mut InstanceMeta<M>), With<ExtractedView>>,
     query_instance: Query<
-        (Entity,),
+        Entity,
         (
             With<Handle<M>>,
             With<<M::Instance as Instance>::ExtractedInstance>,
         ),
     >,
-    mut instance_view_meta: ResMut<InstanceViewMeta<M>>,
 ) {
     debug!("{}", std::any::type_name::<M>());
 
-    for (view_entity, visible_entities) in query_views.iter() {
+    for (view_entity, visible_entities, mut instance_meta) in query_views.iter_mut() {
         debug!("{view_entity:?}");
 
-        instance_view_meta.get_mut(&view_entity).unwrap().instances = visible_entities
+        instance_meta.instances = visible_entities
             .entities
             .iter()
             .copied()
