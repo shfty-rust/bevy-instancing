@@ -15,11 +15,11 @@ use crate::instancing::{
     instance_slice::{InstanceSlice, InstanceSliceTarget},
     material::{
         instanced_material_pipeline::InstancedMaterialPipeline,
+        material_instanced::MaterialInstanced,
         plugin::{
             BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
             GpuInstancedMeshes, InstanceBatchKey, InstanceViewMeta, MeshBatch,
         },
-        material_instanced::MaterialInstanced,
     },
     render::instance::Instance,
 };
@@ -62,11 +62,10 @@ pub fn system<M: MaterialInstanced>(
             } = instance_meta.mesh_batches.get(&key.mesh_key).unwrap();
 
             // Calculate mesh instance counts for this batch
-            let mut mesh_instance_counts = BTreeMap::<&Handle<Mesh>, usize>::new();
-
-            for mesh in meshes {
-                mesh_instance_counts.insert(mesh, 0);
-            }
+            let mut mesh_instance_counts = meshes
+                .iter()
+                .map(|mesh| (mesh, 0))
+                .collect::<BTreeMap<_, _>>();
 
             let instance_meshes = instance_batch
                 .instances
@@ -246,16 +245,14 @@ pub fn system<M: MaterialInstanced>(
             }
 
             // Spawn entity
-            let material_batch = instance_meta
+            let material = instance_meta
                 .material_batches
                 .get(&key.material_key)
-                .unwrap();
+                .unwrap()
+                .material
+                .clone_weak();
 
-            let batch_entity = commands
-                .spawn()
-                .insert(material_batch.material.clone_weak())
-                .insert(key.clone())
-                .id();
+            let batch_entity = commands.spawn().insert(material).insert(key.clone()).id();
 
             // Insert meta
             let indirect_count = indirect_data.len();
