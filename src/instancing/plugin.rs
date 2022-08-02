@@ -1,11 +1,17 @@
 use bevy::{
     asset::load_internal_asset,
-    prelude::{App, HandleUntyped, Plugin, Shader},
+    prelude::{App, HandleUntyped, ParallelSystemDescriptorCoercion, Plugin, Shader},
     reflect::TypeUuid,
-    render::{RenderApp, extract_component::ExtractComponentPlugin},
+    render::{
+        extract_component::ExtractComponentPlugin, render_asset::PrepareAssetLabel, RenderApp,
+        RenderStage,
+    },
 };
 
-use crate::prelude::{InstanceSlice, InstancedMeshPipeline};
+use crate::{
+    instancing::material::systems::prepare_mesh_batches::{self, MeshBatches},
+    prelude::{InstanceSlice, InstancedMeshPipeline},
+};
 
 pub const INSTANCED_MESH_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 7051817732463169032);
@@ -48,6 +54,11 @@ impl Plugin for IndirectRenderingPlugin {
         app.add_plugin(ExtractComponentPlugin::<InstanceSlice>::default());
 
         app.sub_app_mut(RenderApp)
-            .init_resource::<InstancedMeshPipeline>();
+            .init_resource::<InstancedMeshPipeline>()
+            .init_resource::<MeshBatches>()
+            .add_system_to_stage(
+                RenderStage::Prepare,
+                prepare_mesh_batches::system.after(PrepareAssetLabel::AssetPrepare),
+            );
     }
 }

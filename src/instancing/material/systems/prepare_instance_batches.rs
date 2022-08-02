@@ -14,8 +14,8 @@ use crate::instancing::{
     material::{
         material_instanced::MaterialInstanced,
         plugin::{
-            GpuAlphaMode, RenderMeshes, GpuInstances, InstanceBatch, InstanceBatchKey,
-            InstanceMeta, InstancedMaterialBatchKey, MeshBatch, RenderMaterials,
+            GpuAlphaMode, GpuInstances, InstanceBatch, InstanceBatchKey, InstanceMeta,
+            InstancedMaterialBatchKey, MeshBatch, RenderMaterials, RenderMeshes,
         },
     },
     render::instance::Instance,
@@ -27,7 +27,7 @@ pub fn system<M: MaterialInstanced>(
     render_device: Res<RenderDevice>,
     render_meshes: Res<RenderMeshes>,
     render_materials: Res<RenderMaterials<M>>,
-    mesh_batches: Res<MeshBatches<M>>,
+    mesh_batches: Res<MeshBatches>,
     mut query_views: Query<(Entity, &ExtractedView, &mut InstanceMeta<M>), With<VisibleEntities>>,
     query_instance: Query<(
         Entity,
@@ -67,7 +67,12 @@ pub fn system<M: MaterialInstanced>(
                 .iter()
                 .flat_map(|entity| query_instance.get(*entity))
             {
-                let mesh = render_meshes.get(mesh_handle).unwrap();
+                let mesh = if let Some(mesh) = render_meshes.get(mesh_handle) {
+                    mesh
+                } else {
+                    continue;
+                };
+
                 let mesh_key = mesh.key.clone();
 
                 let material = if let Some(material) = render_materials.get(material_handle) {
@@ -107,11 +112,6 @@ pub fn system<M: MaterialInstanced>(
 
             keyed_instances
         });
-
-        debug!("Keyed instances:");
-        for (key, instance) in keyed_instances.iter().enumerate() {
-            debug!("{key:#?}: {instance:#?}");
-        }
 
         let span = bevy::prelude::info_span!("Batch instance slices by key");
         let keyed_instance_slices = span.in_scope(|| {
@@ -173,8 +173,7 @@ pub fn system<M: MaterialInstanced>(
                     instances
                         .iter()
                         .map(|((mesh_handle, _), (_, _, instance))| {
-                            let MeshBatch { meshes, .. } =
-                                mesh_batches.get(&key.mesh_key).unwrap();
+                            let MeshBatch { meshes, .. } = mesh_batches.get(&key.mesh_key).unwrap();
 
                             <M::Instance as Instance>::prepare_instance(
                                 instance,
@@ -238,6 +237,7 @@ pub fn system<M: MaterialInstanced>(
                 let entry = keyed_instance_buffer_data
                     .entry(key.clone())
                     .or_insert_with(gpu_instances);
+
                 entry.push((0..instance_count).map(|_| default()).collect::<Vec<_>>());
             }
         });

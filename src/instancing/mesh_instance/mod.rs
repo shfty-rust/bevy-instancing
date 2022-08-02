@@ -1,5 +1,6 @@
 pub mod mesh_instance_bundle;
 
+use crate::prelude::Instance;
 use bevy::{
     ecs::{query::ROQueryItem, system::lifetimeless::Read},
     math::Mat4,
@@ -9,7 +10,6 @@ use bevy::{
     },
     render::{render_resource::ShaderType, Extract},
 };
-use crate::prelude::Instance;
 
 use super::material::material_instanced::MaterialInstanced;
 
@@ -101,12 +101,21 @@ impl Instance for MeshInstance {
     }
 }
 
+/// Tag type for material-independent identification of instances
+#[derive(Debug, Default, Copy, Clone, Component)]
+pub struct ExtractedInstance;
+
 pub fn extract_mesh_instances<M: MaterialInstanced>(
     query_mesh_instance: Extract<Query<(Entity, <M::Instance as Instance>::Query)>>,
     mut commands: Commands,
 ) {
     for (entity, item) in query_mesh_instance.iter() {
-        commands
-            .insert_or_spawn_batch([(entity, (<M::Instance as Instance>::extract_instance(item),))])
+        commands.insert_or_spawn_batch([(
+            entity,
+            (
+                ExtractedInstance,
+                <M::Instance as Instance>::extract_instance(item),
+            ),
+        )])
     }
 }

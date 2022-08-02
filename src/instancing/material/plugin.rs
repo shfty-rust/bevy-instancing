@@ -90,7 +90,6 @@ where
                 .init_resource::<ExtractedMaterials<M>>()
                 .init_resource::<RenderMeshes>()
                 .init_resource::<RenderMaterials<M>>()
-                .init_resource::<MeshBatches<M>>()
                 .init_resource::<MaterialBatches<M>>()
                 .init_resource::<SpecializedMeshPipelines<InstancedMaterialPipeline<M>>>()
                 .add_system_to_stage(RenderStage::Extract, extract_materials::<M>)
@@ -112,16 +111,12 @@ where
                 )
                 .add_system_to_stage(
                     RenderStage::Prepare,
-                    prepare_mesh_batches::system::<M>.after(PrepareAssetLabel::AssetPrepare),
-                )
-                .add_system_to_stage(
-                    RenderStage::Prepare,
                     prepare_material_batches::system::<M>.after(PrepareAssetLabel::AssetPrepare),
                 )
                 .add_system_to_stage(
                     RenderStage::Prepare,
                     prepare_instance_batches::system::<M>
-                        .after(prepare_mesh_batches::system::<M>)
+                        .after(prepare_mesh_batches::system)
                         .after(prepare_material_batches::system::<M>),
                 )
                 .add_system_to_stage(

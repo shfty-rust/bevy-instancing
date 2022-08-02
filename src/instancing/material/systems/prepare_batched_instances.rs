@@ -33,7 +33,7 @@ pub fn system<M: MaterialInstanced>(
     render_meshes: Res<RenderMeshes>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
-    mesh_batches: Res<MeshBatches<M>>,
+    mesh_batches: Res<MeshBatches>,
     query_instance: Query<(
         Entity,
         &Handle<M>,

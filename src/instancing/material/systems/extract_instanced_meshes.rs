@@ -79,8 +79,8 @@ pub fn system(
         render_meshes.remove(&removed);
     }
 
-    for (handle, material) in extracted_assets {
-        render_meshes.insert(handle, material);
+    for (handle, mesh) in extracted_assets {
+        render_meshes.insert(handle, mesh);
     }
 }
 

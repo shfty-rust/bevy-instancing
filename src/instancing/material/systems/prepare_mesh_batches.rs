@@ -1,88 +1,43 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    marker::PhantomData, ops::{Deref, DerefMut},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
 use bevy::{
-    prelude::{debug, default, info_span, Entity, Handle, Mesh, Query, Res, ResMut},
+    prelude::{default, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut, info},
     render::mesh::Indices,
 };
 
-use crate::instancing::{
-    instance_slice::InstanceSlice,
-    material::{
-        material_instanced::MaterialInstanced,
-        plugin::{GpuIndexBufferData, GpuIndirectData, InstancedMeshKey, MeshBatch, RenderMeshes},
-    },
-    render::instance::Instance,
+use crate::instancing::material::plugin::{
+    GpuIndexBufferData, GpuIndirectData, InstancedMeshKey, MeshBatch, RenderMeshes,
 };
 
-pub struct MeshBatches<M: MaterialInstanced> {
+#[derive(Default, Deref, DerefMut)]
+pub struct MeshBatches {
     pub mesh_batches: BTreeMap<InstancedMeshKey, MeshBatch>,
-    _phantom: PhantomData<M>,
 }
 
-impl<M: MaterialInstanced> Deref for MeshBatches<M> {
-    type Target = BTreeMap<InstancedMeshKey, MeshBatch>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.mesh_batches
+pub fn system(render_meshes: Res<RenderMeshes>, mut mesh_batches: ResMut<MeshBatches>) {
+    if !render_meshes.is_changed() {
+        return
     }
-}
-
-impl<M: MaterialInstanced> DerefMut for MeshBatches<M> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.mesh_batches
-    }
-}
-
-impl<M: MaterialInstanced> Default for MeshBatches<M> {
-    fn default() -> Self {
-        Self {
-            mesh_batches: Default::default(),
-            _phantom: Default::default(),
-        }
-    }
-}
-
-pub fn system<M: MaterialInstanced>(
-    render_meshes: Res<RenderMeshes>,
-    query_instance: Query<(
-        Entity,
-        &Handle<M>,
-        &Handle<Mesh>,
-        &<M::Instance as Instance>::ExtractedInstance,
-    )>,
-    query_instance_slice: Query<(Entity, &Handle<M>, &Handle<Mesh>, &InstanceSlice)>,
-    mut mesh_batches: ResMut<MeshBatches<M>>,
-) {
-    debug!("{}", std::any::type_name::<M>());
 
     let render_meshes = &render_meshes.instanced_meshes;
 
     // Sort meshes into batches by their InstancedMeshKey
     let keyed_meshes = info_span!("Key meshes").in_scope(|| {
         let mut keyed_meshes = BTreeMap::<InstancedMeshKey, BTreeSet<Handle<Mesh>>>::new();
-        for mesh_handle in query_instance
-            .iter()
-            .map(|(_, _, mesh, _)| mesh)
-            .chain(query_instance_slice.iter().map(|(_, _, mesh, _)| mesh))
-        {
-            let mesh = render_meshes.get(&mesh_handle).unwrap();
+        for (handle, mesh) in render_meshes.iter() {
             keyed_meshes
                 .entry(mesh.key.clone())
                 .or_default()
-                .insert(mesh_handle.clone_weak());
+                .insert(handle.clone_weak());
         }
         keyed_meshes
     });
 
     // Generate vertex, index, and indirect data for each batch
-    mesh_batches.mesh_batches = info_span!("Batch meshes").in_scope(|| {
-        keyed_meshes
-            .into_iter()
-            .map(|(key, meshes)| {
+    info_span!("Batch meshes").in_scope(|| {
+        mesh_batches.extend({
+            keyed_meshes.into_iter().map(|(key, meshes)| {
                 let vertex_data = info_span!("Vertex data").in_scope(|| {
                     meshes
                         .iter()
@@ -208,6 +163,6 @@ pub fn system<M: MaterialInstanced>(
                     },
                 )
             })
-            .collect()
+        })
     });
 }
