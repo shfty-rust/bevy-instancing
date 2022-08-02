@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 bevy = { version = "0.8.0", features = [
-        #"dynamic"
+        "dynamic"
 ]}
 bytemuck = "1.11.0"
 wgpu = "*"
@@ -13,3 +13,17 @@ wgpu = "*"
 [[example]]
 name = "instance_compute"
 path = "examples/instance_slice/instance_compute.rs"
+
+# Fast-compile config for crates in this workspace
+[profile.dev]
+opt-level = 0
+overflow-checks = true
+debug-assertions = true
+debug = false
+codegen-units = 8
+lto = false
+incremental = true
+
+# Use opt level 3 for dependencies not part of this workspace
+[profile.dev.package."*"]
+opt-level = 3
