@@ -56,8 +56,8 @@ use std::marker::PhantomData;
 
 use super::systems::{
     extract_instanced_meshes, extract_instanced_view_meta, prepare_batched_instances,
-    prepare_instance_batches, prepare_instance_slice_targets, prepare_material_batches,
-    prepare_mesh_batches, prepare_view_instance_slices, prepare_view_instances,
+    prepare_instance_batches, prepare_instance_slice_targets, prepare_material_batches::{self, MaterialBatches},
+    prepare_mesh_batches::{self, MeshBatches}, prepare_view_instance_slices, prepare_view_instances,
     queue_instanced_materials,
 };
 
@@ -90,6 +90,8 @@ where
                 .init_resource::<ExtractedMaterials<M>>()
                 .init_resource::<RenderMeshes>()
                 .init_resource::<RenderMaterials<M>>()
+                .init_resource::<MeshBatches<M>>()
+                .init_resource::<MaterialBatches<M>>()
                 .init_resource::<SpecializedMeshPipelines<InstancedMaterialPipeline<M>>>()
                 .add_system_to_stage(RenderStage::Extract, extract_materials::<M>)
                 .add_system_to_stage(RenderStage::Extract, extract_mesh_instances::<M>)
@@ -501,13 +503,11 @@ where
     }
 }
 
-/// Resource containing instance batches
+/// Resource containing per-view instance data
 #[derive(Component)]
 pub struct InstanceMeta<M: MaterialInstanced> {
     pub instances: Vec<Entity>,
     pub instance_slices: Vec<Entity>,
-    pub mesh_batches: BTreeMap<InstancedMeshKey, MeshBatch>,
-    pub material_batches: BTreeMap<InstancedMaterialBatchKey<M>, MaterialBatch<M>>,
     pub instance_batches: BTreeMap<InstanceBatchKey<M>, InstanceBatch<M>>,
     pub batched_instances: BTreeMap<InstanceBatchKey<M>, BatchedInstances>,
 }
@@ -517,8 +517,6 @@ impl<M: MaterialInstanced> Default for InstanceMeta<M> {
         Self {
             instances: default(),
             instance_slices: default(),
-            mesh_batches: default(),
-            material_batches: default(),
             instance_batches: default(),
             batched_instances: default(),
         }

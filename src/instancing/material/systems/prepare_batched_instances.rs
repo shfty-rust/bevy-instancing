@@ -18,12 +18,14 @@ use crate::instancing::{
         material_instanced::MaterialInstanced,
         plugin::{
             BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
-            RenderMeshes, InstanceMeta,
+            InstanceMeta, RenderMeshes,
         },
     },
     render::instance::Instance,
 };
 use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
+
+use super::prepare_mesh_batches::MeshBatches;
 
 #[allow(clippy::too_many_arguments)]
 pub fn system<M: MaterialInstanced>(
@@ -31,6 +33,7 @@ pub fn system<M: MaterialInstanced>(
     render_meshes: Res<RenderMeshes>,
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
+    mesh_batches: Res<MeshBatches<M>>,
     query_instance: Query<(
         Entity,
         &Handle<M>,
@@ -60,7 +63,7 @@ pub fn system<M: MaterialInstanced>(
             debug!("{key:#?}");
 
             // Fetch data
-            let mesh_batch = instance_meta.mesh_batches.get(&key.mesh_key).unwrap();
+            let mesh_batch = mesh_batches.get(&key.mesh_key).unwrap();
             let indirect_count = mesh_batch.indirect_data.len();
 
             // Calculate mesh instance counts for this batch

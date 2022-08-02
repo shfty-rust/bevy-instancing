@@ -17,8 +17,11 @@ use crate::instancing::material::{
     plugin::{DrawInstanced, GpuAlphaMode, InstanceMeta},
 };
 
+use super::prepare_material_batches::MaterialBatches;
+
 #[allow(clippy::too_many_arguments)]
 pub fn system<M: MaterialInstanced>(
+    material_batches: Res<MaterialBatches<M>>,
     opaque_draw_functions: Res<DrawFunctions<Opaque3d>>,
     alpha_mask_draw_functions: Res<DrawFunctions<AlphaMask3d>>,
     transparent_draw_functions: Res<DrawFunctions<Transparent3d>>,
@@ -43,8 +46,8 @@ pub fn system<M: MaterialInstanced>(
             debug!("{key:#?}");
 
             // Spawn entity
-            let material = instance_meta
-                .material_batches
+            let material = 
+                material_batches
                 .get(&key.material_key)
                 .unwrap()
                 .material
@@ -74,8 +77,8 @@ pub fn system<M: MaterialInstanced>(
                 mesh_key |= MeshPipelineKey::TRANSPARENT_MAIN_PASS;
             }
 
-            let material_batch = instance_meta
-                .material_batches
+            let material_batch = 
+                material_batches
                 .get(&key.material_key)
                 .unwrap();
 

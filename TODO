@@ -1,18 +1,20 @@
+TODO: Optimization pass
+      * Batch meshes on change instead of every frame
+        * In this context, on change means "when a mesh is added or removed from a set of entities with a given material"
+
+      * Use BufferVec to cache batch data inside InstanceMeta
+        * Avoid clearing every draw
+          * Instead, prune empty buffers
+        * Should be able to avoid unnecessary writes on frames where the
+          buffer data for a given key doesn't change
+          * Seems important, since the act of writing data to the GPU is what indirect avoids
+
 TODO: Specialized binding example for instance compute
       * Double-buffer instances for 3D boids
 
 TODO: Account for uniform buffer size limits
       * Currently only binding one set of UNIFORM_MAX_INSTANCES-length instances
       * Need to split instance batches by max size, spread across extra draw calls
-
-TODO: Optimization pass for instanced mesh batcher
-
-TODO: Use BufferVec to cache batch data inside InstanceMeta
-      * Avoid clearing every draw
-        * Instead, prune empty buffers
-      * Should be able to avoid unnecessary writes on frames where the
-        buffer data for a given key doesn't change
-        * Seems important, since the act of writing data to the GPU is what indirect avoids
 
 TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances

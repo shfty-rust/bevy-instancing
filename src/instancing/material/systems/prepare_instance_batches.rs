@@ -21,10 +21,13 @@ use crate::instancing::{
     render::instance::Instance,
 };
 
+use super::prepare_mesh_batches::MeshBatches;
+
 pub fn system<M: MaterialInstanced>(
     render_device: Res<RenderDevice>,
     render_meshes: Res<RenderMeshes>,
     render_materials: Res<RenderMaterials<M>>,
+    mesh_batches: Res<MeshBatches<M>>,
     mut query_views: Query<(Entity, &ExtractedView, &mut InstanceMeta<M>), With<VisibleEntities>>,
     query_instance: Query<(
         Entity,
@@ -171,7 +174,7 @@ pub fn system<M: MaterialInstanced>(
                         .iter()
                         .map(|((mesh_handle, _), (_, _, instance))| {
                             let MeshBatch { meshes, .. } =
-                                instance_meta.mesh_batches.get(&key.mesh_key).unwrap();
+                                mesh_batches.get(&key.mesh_key).unwrap();
 
                             <M::Instance as Instance>::prepare_instance(
                                 instance,
