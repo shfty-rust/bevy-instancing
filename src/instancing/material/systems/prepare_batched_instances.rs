@@ -1,15 +1,17 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, num::NonZeroU64};
 
 use bevy::{
     prelude::{debug, info_span, Entity, Handle, Mesh, Query, Res, With},
     render::{
         mesh::Indices,
-        render_resource::BufferVec,
+        render_resource::{BufferVec, ShaderSize},
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
     },
 };
-use wgpu::{util::BufferInitDescriptor, BindGroupDescriptor, BindGroupEntry, BufferUsages};
+use wgpu::{
+    util::BufferInitDescriptor, BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages,
+};
 
 use crate::instancing::{
     instance_slice::InstanceSlice,
@@ -18,7 +20,7 @@ use crate::instancing::{
         material_instanced::MaterialInstanced,
         plugin::{
             BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
-            InstanceMeta, RenderMeshes,
+            InstanceMeta, RenderMeshes, MAX_UNIFORM_BUFFER_INSTANCES,
         },
     },
     render::instance::Instance,
@@ -62,10 +64,18 @@ pub fn system<M: MaterialInstanced>(
         {
             debug!("{key:#?}");
 
-            // Fetch data
+            // Fetch mesh batch data
             let mesh_batch = mesh_batches.get(&key.mesh_key).unwrap();
 
-            // Calculate mesh instance counts for this batch
+            // Fetch vertex and index buffers
+            let vertex_buffer = mesh_batch.vertex_data.buffer().unwrap().clone();
+            let index_buffer = mesh_batch
+                .index_data
+                .as_ref()
+                .map(|index_data| index_data.buffer().unwrap().clone())
+                .map(|index_buffer| (index_buffer, key.mesh_key.index_format.unwrap()));
+
+            // Calculate mesh instance counts for indirect data
             let mesh_instance_counts = info_span!("Mesh instance counts").in_scope(|| {
                 let mut mesh_instance_counts = mesh_batch
                     .meshes
@@ -103,7 +113,7 @@ pub fn system<M: MaterialInstanced>(
                 mesh_instance_counts
             });
 
-            // Calculate instance offsets for this batch
+            // Calculate instance offsets for indirect data
             let (mesh_instance_offsets, _) = info_span!("Mesh instance offsets").in_scope(|| {
                 mesh_instance_counts.iter().fold(
                     (BTreeMap::<&Handle<Mesh>, usize>::new(), 0),
@@ -115,7 +125,7 @@ pub fn system<M: MaterialInstanced>(
                 )
             });
 
-            // Calculate vertex offsets for this batch's mesh
+            // Calculate vertex offsets for indirect data
             let (mesh_vertex_offsets, _) = info_span!("Mesh vertex offsets").in_scope(|| {
                 mesh_instance_counts.iter().fold(
                     (BTreeMap::<&Handle<Mesh>, usize>::new(), 0),
@@ -136,14 +146,9 @@ pub fn system<M: MaterialInstanced>(
                 )
             });
 
-            // Create buffers
-            let vertex_buffer = mesh_batch.vertex_data.buffer().unwrap().clone();
-            let index_buffer = mesh_batch
-                .index_data
-                .as_ref()
-                .map(|index_data| index_data.buffer().unwrap().clone());
-
-            let mut indirect_buffer =
+            // Build indirect buffer
+            let mut indirect_buffer = BufferVec::new(BufferUsages::INDIRECT);
+            let indirect_buffer =
                 info_span!("Create indirect buffer").in_scope(|| match &mesh_batch.indirect_data {
                     GpuIndirectData::Indexed { buffer } => {
                         let indirect_data = buffer
@@ -172,14 +177,19 @@ pub fn system<M: MaterialInstanced>(
                             )
                             .collect::<Vec<_>>();
 
-                        let mut indirect_buffer = BufferVec::new(BufferUsages::INDIRECT);
-                        for indirect in &indirect_data {
-                            indirect_buffer.push(*indirect);
+                        let bytes: Vec<u8> = bytemuck::cast_slice(&indirect_data).to_vec();
+
+                        indirect_buffer.reserve(bytes.len(), &render_device);
+
+                        for byte in bytes {
+                            indirect_buffer.push(byte);
                         }
+
+                        indirect_buffer.write_buffer(&render_device, &render_queue);
 
                         GpuIndirectBufferData::Indexed {
                             indirects: indirect_data,
-                            buffer: indirect_buffer,
+                            buffer: indirect_buffer.buffer().unwrap().clone(),
                         }
                     }
                     GpuIndirectData::NonIndexed { buffer } => {
@@ -205,32 +215,44 @@ pub fn system<M: MaterialInstanced>(
                             )
                             .collect::<Vec<_>>();
 
-                        let mut indirect_buffer = BufferVec::new(BufferUsages::INDIRECT);
-                        for indirect in &indirect_data {
-                            indirect_buffer.push(*indirect);
+                        let bytes: Vec<u8> = bytemuck::cast_slice(&indirect_data).to_vec();
+
+                        indirect_buffer.reserve(bytes.len(), &render_device);
+
+                        for byte in bytes {
+                            indirect_buffer.push(byte);
                         }
+
+                        indirect_buffer.write_buffer(&render_device, &render_queue);
 
                         GpuIndirectBufferData::NonIndexed {
                             indirects: indirect_data,
-                            buffer: indirect_buffer,
+                            buffer: indirect_buffer.buffer().unwrap().clone(),
                         }
                     }
                 });
 
-            // Write buffers
-            info_span!("Write buffers").in_scope(|| {
+            // Write instance buffer
+            info_span!("Write instance buffers").in_scope(|| {
                 instance_meta
                     .instance_batches
                     .get_mut(&key)
                     .unwrap()
                     .instance_buffer_data
                     .write_buffer(&render_device, &render_queue);
-
-                indirect_buffer.write_buffer(&render_device, &render_queue)
             });
 
             // Create bind group
             let instance_bind_group = info_span!("Create bind group").in_scope(|| {
+                let uniform_binding_size = <[<M::Instance as Instance>::PreparedInstance;
+                    MAX_UNIFORM_BUFFER_INSTANCES] as ShaderSize>::SHADER_SIZE;
+
+                let instance_buffer_data = &instance_meta
+                    .instance_batches
+                    .get(&key)
+                    .unwrap()
+                    .instance_buffer_data;
+
                 render_device.create_bind_group(&BindGroupDescriptor {
                     label: Some("instance bind group"),
                     layout: &instanced_material_pipeline
@@ -238,13 +260,18 @@ pub fn system<M: MaterialInstanced>(
                         .bind_group_layout,
                     entries: &[BindGroupEntry {
                         binding: 0,
-                        resource: instance_meta
-                            .instance_batches
-                            .get(&key)
-                            .unwrap()
-                            .instance_buffer_data
-                            .binding()
-                            .unwrap(),
+                        resource: wgpu::BindingResource::Buffer(BufferBinding {
+                            buffer: instance_buffer_data.buffer().unwrap(),
+                            offset: 0,
+                            size: match instance_buffer_data {
+                                crate::instancing::material::plugin::GpuInstances::Uniform {
+                                    ..
+                                } => Some(uniform_binding_size),
+                                crate::instancing::material::plugin::GpuInstances::Storage {
+                                    ..
+                                } => None,
+                            },
+                        }),
                     }],
                 })
             });
@@ -255,8 +282,7 @@ pub fn system<M: MaterialInstanced>(
                     key.clone(),
                     BatchedInstances {
                         vertex_buffer,
-                        index_buffer: index_buffer
-                            .map(|index_buffer| (index_buffer, key.mesh_key.index_format.unwrap())),
+                        index_buffer,
                         indirect_buffer,
                         instance_bind_group,
                     },

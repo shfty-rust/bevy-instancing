@@ -25,3 +25,11 @@ pub trait Instance {
 
     fn transform(instance: &Self::ExtractedInstance) -> Mat4;
 }
+
+pub trait InstanceUniformLength: Instance {
+    const UNIFORM_BUFFER_LENGTH: usize;
+}
+
+impl<T: Instance> InstanceUniformLength for T  where T: Instance {
+    const UNIFORM_BUFFER_LENGTH: usize = 16384 / std::mem::size_of::<T::PreparedInstance>();
+}

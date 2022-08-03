@@ -24,7 +24,7 @@ use bevy::{
             TrackedRenderPass,
         },
         render_resource::{
-            AsBindGroupError, BindingResource, BufferBindingType, BufferVec, DynamicUniformBuffer,
+            AsBindGroupError, BindingResource, BufferBindingType, DynamicUniformBuffer,
             IndexFormat, OwnedBindingResource, ShaderType, SpecializedMeshPipelines, StorageBuffer,
         },
         renderer::RenderQueue,
@@ -513,19 +513,19 @@ impl<M: MaterialInstanced> Default for InstanceMeta<M> {
 pub enum GpuIndirectBufferData {
     Indexed {
         indirects: Vec<DrawIndexedIndirect>,
-        buffer: BufferVec<DrawIndexedIndirect>,
+        buffer: Buffer,
     },
     NonIndexed {
         indirects: Vec<DrawIndirect>,
-        buffer: BufferVec<DrawIndirect>,
+        buffer: Buffer,
     },
 }
 
 impl GpuIndirectBufferData {
-    pub fn buffer(&self) -> Option<&Buffer> {
+    pub fn buffer(&self) -> &Buffer {
         match self {
-            GpuIndirectBufferData::Indexed { buffer, .. } => buffer.buffer(),
-            GpuIndirectBufferData::NonIndexed { buffer, .. } => buffer.buffer(),
+            GpuIndirectBufferData::Indexed { buffer, .. } => buffer,
+            GpuIndirectBufferData::NonIndexed { buffer, .. } => buffer,
         }
     }
 
@@ -540,13 +540,6 @@ impl GpuIndirectBufferData {
         match self {
             GpuIndirectBufferData::Indexed { indirects, .. } => Some(indirects),
             _ => None,
-        }
-    }
-
-    pub fn write_buffer(&mut self, device: &RenderDevice, queue: &RenderQueue) {
-        match self {
-            GpuIndirectBufferData::Indexed { buffer, .. } => buffer.write_buffer(device, &queue),
-            GpuIndirectBufferData::NonIndexed { buffer, .. } => buffer.write_buffer(device, queue),
         }
     }
 }
@@ -616,7 +609,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                         debug!("Drawing indexed indirect {i:?}: {indirect:#?}");
 
                         pass.draw_indexed_indirect(
-                            batched_instances.indirect_buffer.buffer().unwrap(),
+                            batched_instances.indirect_buffer.buffer(),
                             (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
                         );
                     } else {
@@ -653,7 +646,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                         debug!("Drawing indirect {i:?}: {indirect:#?}");
 
                         pass.draw_indirect(
-                            batched_instances.indirect_buffer.buffer().unwrap(),
+                            batched_instances.indirect_buffer.buffer(),
                             (i * std::mem::size_of::<DrawIndirect>()) as u64,
                         );
                     } else {

@@ -11,7 +11,6 @@ use bevy::{
     render::{
         camera::{Projection, RenderTarget},
         render_resource::Face,
-        settings::WgpuSettings,
     },
     window::{CreateWindow, PresentMode, WindowDescriptor, WindowId},
     DefaultPlugins,
@@ -27,16 +26,16 @@ const USE_SECOND_CAMERA: bool = false;
 fn main() {
     let mut app = App::default();
 
-    app.insert_resource(WgpuSettings {
-        /*
-        disabled_features: Some(Features::INDIRECT_FIRST_INSTANCE),
-        constrained_limits: Some(Limits {
+    /*
+    app.insert_resource(bevy::render::settings::WgpuSettings {
+        disabled_features: Some(wgpu::Features::INDIRECT_FIRST_INSTANCE),
+        constrained_limits: Some(wgpu::Limits {
             max_storage_buffers_per_shader_stage: 0,
             ..default()
         }),
-        */
         ..default()
     });
+    */
 
     app.add_plugins(DefaultPlugins)
         .add_plugin(IndirectRenderingPlugin)
