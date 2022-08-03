@@ -1,7 +1,4 @@
 TODO: Optimization pass
-      * GPU-side vertex and index buffers can be created during mesh batching
-        * Use BufferVecs inside MeshBatch struct, write on change
-        * Should bring prepare_batched_instances overhead down to acceptable levels
       * Base indirect buffer can be generated during mesh batching,
         but needs to be duplicated and updated with counts + offsets for each instance batch
         * Per-batch indirect buffers should live as a BufferVec in a resource, update by batch key

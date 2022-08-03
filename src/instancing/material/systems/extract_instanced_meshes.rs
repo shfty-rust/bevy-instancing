@@ -7,7 +7,7 @@ use bevy::{
 };
 
 use crate::instancing::material::plugin::{
-    GpuIndexBufferData, GpuInstancedMesh, RenderMeshes, InstancedMeshKey,
+    GpuInstancedMesh, RenderMeshes, InstancedMeshKey, GpuIndexBufferData,
 };
 
 pub fn system(
@@ -42,7 +42,6 @@ pub fn system(
                 |indices| -> GpuIndexBufferData {
                     GpuIndexBufferData::Indexed {
                         indices: indices.clone(),
-                        index_count: mesh.indices().unwrap().len() as u32,
                         index_format: mesh.indices().unwrap().into(),
                     }
                 },

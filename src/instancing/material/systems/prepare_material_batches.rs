@@ -5,20 +5,11 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use bevy::{
-    prelude::{debug, info, Entity, Handle, Query, Res, ResMut, With},
-    render::view::{ExtractedView, VisibleEntities},
-};
+use bevy::prelude::{debug, info, Res, ResMut};
 
-use crate::instancing::{
-    instance_slice::InstanceSlice,
-    material::{
-        material_instanced::MaterialInstanced,
-        plugin::{
-            GpuAlphaMode, InstanceMeta, InstancedMaterialBatchKey, MaterialBatch, RenderMaterials,
-        },
-    },
-    render::instance::Instance,
+use crate::instancing::material::{
+    material_instanced::MaterialInstanced,
+    plugin::{GpuAlphaMode, InstancedMaterialBatchKey, MaterialBatch, RenderMaterials},
 };
 
 pub struct MaterialBatches<M: MaterialInstanced> {
@@ -64,28 +55,19 @@ impl<M: MaterialInstanced> DerefMut for MaterialBatches<M> {
 pub fn system<M: MaterialInstanced>(
     render_materials: Res<RenderMaterials<M>>,
     mut material_batches: ResMut<MaterialBatches<M>>,
-    query_views: Query<
-        (Entity, &mut InstanceMeta<M>),
-        (With<ExtractedView>, With<VisibleEntities>),
-    >,
-    query_instance: Query<(
-        Entity,
-        &Handle<M>,
-        &<M::Instance as Instance>::ExtractedInstance,
-    )>,
-    query_instance_slice: Query<(Entity, &Handle<M>, &InstanceSlice)>,
 ) where
     M::Data: Debug + Clone,
 {
+    if !render_materials.is_changed() {
+        return;
+    }
+
     debug!("{}", std::any::type_name::<M>());
 
     // Batch materials by key
-    **material_batches = query_instance
+    **material_batches = render_materials
         .iter()
-        .map(|(_, material, _)| material)
-        .chain(query_instance_slice.iter().map(|(_, material, _)| material))
-        .flat_map(|material_handle| {
-            let material = render_materials.get(material_handle)?;
+        .flat_map(|(material_handle, material)| {
             Some((
                 InstancedMaterialBatchKey {
                     alpha_mode: GpuAlphaMode::from(material.properties.alpha_mode),

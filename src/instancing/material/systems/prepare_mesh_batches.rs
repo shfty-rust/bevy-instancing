@@ -1,23 +1,67 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
+use crate::{
+    instancing::material::plugin::GpuIndexBufferData,
+    prelude::{DrawIndexedIndirect, DrawIndirect},
+};
 use bevy::{
-    prelude::{default, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut, info},
-    render::mesh::Indices,
+    prelude::{default, info, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut},
+    render::{
+        mesh::Indices,
+        render_resource::BufferVec,
+        renderer::{RenderDevice, RenderQueue},
+    },
 };
+use wgpu::{BufferUsages, IndexFormat};
 
-use crate::instancing::material::plugin::{
-    GpuIndexBufferData, GpuIndirectData, InstancedMeshKey, MeshBatch, RenderMeshes,
-};
+use crate::instancing::material::plugin::{GpuIndirectData, InstancedMeshKey, RenderMeshes};
+
+pub enum BufferIndices {
+    U32(BufferVec<u32>),
+    U16(BufferVec<u16>),
+}
+
+impl BufferIndices {
+    pub fn len(&self) -> usize {
+        match self {
+            BufferIndices::U32(indices) => indices.len(),
+            BufferIndices::U16(indices) => indices.len(),
+        }
+    }
+}
+
+/*
+pub enum GpuIndexBufferData {
+    Indexed {
+        indices: Indices,
+        index_format: IndexFormat,
+    },
+    NonIndexed {
+        vertex_count: u32,
+    },
+}
+*/
+
+pub struct MeshBatch {
+    pub meshes: BTreeSet<Handle<Mesh>>,
+    pub vertex_data: BufferVec<u8>,
+    pub index_data: Option<BufferVec<u8>>,
+    pub indirect_data: GpuIndirectData,
+}
 
 #[derive(Default, Deref, DerefMut)]
 pub struct MeshBatches {
     pub mesh_batches: BTreeMap<InstancedMeshKey, MeshBatch>,
 }
 
-pub fn system(render_meshes: Res<RenderMeshes>, mut mesh_batches: ResMut<MeshBatches>) {
+pub fn system(
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+    render_meshes: Res<RenderMeshes>,
+    mut mesh_batches: ResMut<MeshBatches>,
+) {
     if !render_meshes.is_changed() {
-        return
+        return;
     }
 
     let render_meshes = &render_meshes.instanced_meshes;
@@ -39,76 +83,77 @@ pub fn system(render_meshes: Res<RenderMeshes>, mut mesh_batches: ResMut<MeshBat
         mesh_batches.extend({
             keyed_meshes.into_iter().map(|(key, meshes)| {
                 let vertex_data = info_span!("Vertex data").in_scope(|| {
-                    meshes
+                    let mut vertex_data =
+                        BufferVec::new(BufferUsages::VERTEX | BufferUsages::COPY_DST);
+
+                    let bytes = meshes
                         .iter()
                         .flat_map(|mesh| render_meshes.get(mesh))
                         .flat_map(|mesh| mesh.vertex_buffer_data.iter())
                         .copied()
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<_>>();
+
+                    vertex_data.reserve(bytes.len(), &render_device);
+
+                    for byte in bytes {
+                        vertex_data.push(byte);
+                    }
+
+                    vertex_data.write_buffer(&render_device, &render_queue);
+
+                    vertex_data
                 });
 
-                let mut base_index = 0;
                 let index_data = info_span!("Index data").in_scope(|| {
-                    meshes.iter().fold(None, |acc, mesh| {
+                    let mut base_index = 0;
+                    let indices = meshes.iter().fold(None, |acc, mesh| {
                         let mesh = render_meshes.get(mesh).unwrap();
 
                         let out = match &mesh.index_buffer_data {
-                            GpuIndexBufferData::Indexed {
-                                indices,
-                                index_count,
-                                index_format,
-                            } => Some(match acc {
-                                Some(GpuIndexBufferData::Indexed {
-                                    indices: acc_indices,
-                                    index_count: acc_index_count,
-                                    ..
-                                }) => GpuIndexBufferData::Indexed {
-                                    indices: match (acc_indices, indices) {
-                                        (Indices::U16(lhs), Indices::U16(rhs)) => Indices::U16(
-                                            lhs.iter()
-                                                .copied()
-                                                .chain(
-                                                    rhs.iter().map(|idx| base_index as u16 + *idx),
-                                                )
-                                                .collect(),
-                                        ),
-                                        (Indices::U32(lhs), Indices::U32(rhs)) => Indices::U32(
-                                            lhs.iter()
-                                                .copied()
-                                                .chain(
-                                                    rhs.iter().map(|idx| base_index as u32 + *idx),
-                                                )
-                                                .collect(),
-                                        ),
-                                        _ => panic!("Mismatched index format"),
-                                    },
-
-                                    index_count: index_count + acc_index_count,
-                                    index_format: *index_format,
+                            GpuIndexBufferData::Indexed { indices, .. } => Some(match acc {
+                                Some(acc_indices) => match (acc_indices, indices) {
+                                    (Indices::U16(lhs), Indices::U16(rhs)) => Indices::U16(
+                                        lhs.iter()
+                                            .copied()
+                                            .chain(rhs.iter().map(|idx| base_index as u16 + *idx))
+                                            .collect(),
+                                    ),
+                                    (Indices::U32(lhs), Indices::U32(rhs)) => Indices::U32(
+                                        lhs.iter()
+                                            .copied()
+                                            .chain(rhs.iter().map(|idx| base_index as u32 + *idx))
+                                            .collect(),
+                                    ),
+                                    _ => panic!("Mismatched index format"),
                                 },
-                                None => GpuIndexBufferData::Indexed {
-                                    indices: indices.clone(),
-                                    index_count: *index_count,
-                                    index_format: *index_format,
-                                },
-                                _ => panic!("Mismatched GpuIndexBufferData"),
+                                None => indices.clone(),
                             }),
-                            GpuIndexBufferData::NonIndexed { vertex_count } => Some(match acc {
-                                Some(GpuIndexBufferData::NonIndexed {
-                                    vertex_count: acc_vertex_count,
-                                }) => GpuIndexBufferData::NonIndexed {
-                                    vertex_count: vertex_count + acc_vertex_count,
-                                },
-                                None => GpuIndexBufferData::NonIndexed {
-                                    vertex_count: *vertex_count,
-                                },
-                                _ => panic!("Mismatched GpuIndexBufferData"),
-                            }),
+                            GpuIndexBufferData::NonIndexed { .. } => None,
                         };
 
                         base_index += mesh.vertex_count;
 
                         out
+                    });
+
+                    indices.map(|indices| {
+                        let bytes: Vec<u8> = match indices {
+                            Indices::U16(indices) => bytemuck::cast_slice(&indices).to_vec(),
+                            Indices::U32(indices) => bytemuck::cast_slice(&indices).to_vec(),
+                        };
+
+                        let mut index_data =
+                            BufferVec::new(BufferUsages::INDEX | BufferUsages::COPY_DST);
+
+                        index_data.reserve(bytes.len(), &render_device);
+
+                        for byte in bytes {
+                            index_data.push(byte);
+                        }
+
+                        index_data.write_buffer(&render_device, &render_queue);
+
+                        index_data
                     })
                 });
 
@@ -120,11 +165,11 @@ pub fn system(render_meshes: Res<RenderMeshes>, mut mesh_batches: ResMut<MeshBat
                                 .iter()
                                 .map(|mesh| {
                                     match &render_meshes.get(mesh).unwrap().index_buffer_data {
-                                        GpuIndexBufferData::Indexed { index_count, .. } => {
-                                            base_index += index_count;
+                                        GpuIndexBufferData::Indexed { indices, .. } => {
+                                            base_index += indices.len() as u32;
 
                                             DrawIndexedIndirect {
-                                                vertex_count: *index_count,
+                                                vertex_count: indices.len() as u32,
                                                 ..default()
                                             }
                                         }

@@ -125,10 +125,12 @@ pub fn system<M: MaterialInstanced>(
 
                         let gpu_mesh = render_meshes.get(mesh).unwrap();
 
-                        offset += match gpu_mesh.index_buffer_data {
-                            GpuIndexBufferData::Indexed { index_count, .. } => index_count,
-                            GpuIndexBufferData::NonIndexed { vertex_count } => vertex_count,
-                        } as usize;
+                        offset += match &gpu_mesh.index_buffer_data {
+                            GpuIndexBufferData::Indexed { indices, .. } => indices.len(),
+                            GpuIndexBufferData::NonIndexed { vertex_count } => {
+                                *vertex_count as usize
+                            }
+                        };
 
                         (offsets, offset)
                     },
@@ -136,28 +138,11 @@ pub fn system<M: MaterialInstanced>(
             });
 
             // Create buffers
-            let vertex_buffer = info_span!("Create vertex buffer").in_scope(|| {
-                render_device.create_buffer_with_data(&BufferInitDescriptor {
-                    label: Some("instanced vertex buffer"),
-                    contents: &mesh_batch.vertex_data,
-                    usage: BufferUsages::VERTEX,
-                })
-            });
-
-            let index_buffer =
-                info_span!("Create index buffer").in_scope(|| match &mesh_batch.index_data {
-                    Some(GpuIndexBufferData::Indexed { indices, .. }) => Some({
-                        render_device.create_buffer_with_data(&BufferInitDescriptor {
-                            label: Some("instanced index buffer"),
-                            contents: match indices {
-                                Indices::U16(indices) => bytemuck::cast_slice(indices),
-                                Indices::U32(indices) => bytemuck::cast_slice(indices),
-                            },
-                            usage: BufferUsages::INDEX,
-                        })
-                    }),
-                    _ => None,
-                });
+            let vertex_buffer = mesh_batch.vertex_data.buffer().unwrap().clone();
+            let index_buffer = mesh_batch
+                .index_data
+                .as_ref()
+                .map(|index_data| index_data.buffer().unwrap().clone());
 
             let mut indirect_buffer =
                 info_span!("Create indirect buffer").in_scope(|| match &mesh_batch.indirect_data {

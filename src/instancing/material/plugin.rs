@@ -56,8 +56,9 @@ use std::marker::PhantomData;
 
 use super::systems::{
     extract_instanced_meshes, extract_instanced_view_meta, prepare_batched_instances,
-    prepare_instance_batches, prepare_instance_slice_targets, prepare_material_batches::{self, MaterialBatches},
-    prepare_mesh_batches::{self, MeshBatches}, prepare_view_instance_slices, prepare_view_instances,
+    prepare_instance_batches, prepare_instance_slice_targets,
+    prepare_material_batches::{self, MaterialBatches},
+    prepare_mesh_batches, prepare_view_instance_slices, prepare_view_instances,
     queue_instanced_materials,
 };
 
@@ -166,6 +167,17 @@ impl Ord for InstancedMeshKey {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum GpuIndexBufferData {
+    Indexed {
+        indices: Indices,
+        index_format: IndexFormat,
+    },
+    NonIndexed {
+        vertex_count: u32,
+    },
+}
+
 /// Render world representation of an instanced mesh
 #[derive(Debug, Clone)]
 pub struct GpuInstancedMesh {
@@ -175,18 +187,6 @@ pub struct GpuInstancedMesh {
     pub primitive_topology: PrimitiveTopology,
     pub layout: MeshVertexBufferLayout,
     pub key: InstancedMeshKey,
-}
-
-#[derive(Debug, Clone)]
-pub enum GpuIndexBufferData {
-    Indexed {
-        indices: Indices,
-        index_count: u32,
-        index_format: IndexFormat,
-    },
-    NonIndexed {
-        vertex_count: u32,
-    },
 }
 
 #[derive(Debug, Clone, Deref, DerefMut)]
@@ -362,14 +362,6 @@ where
             .field("material_key", &self.material_key)
             .finish()
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct MeshBatch {
-    pub meshes: BTreeSet<Handle<Mesh>>,
-    pub vertex_data: Vec<u8>,
-    pub index_data: Option<GpuIndexBufferData>,
-    pub indirect_data: GpuIndirectData,
 }
 
 pub const MAX_UNIFORM_BUFFER_INSTANCES: usize = 112;

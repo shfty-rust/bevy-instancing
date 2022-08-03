@@ -15,8 +15,8 @@ use crate::instancing::{
         material_instanced::MaterialInstanced,
         plugin::{
             GpuAlphaMode, GpuInstances, InstanceBatch, InstanceBatchKey, InstanceMeta,
-            InstancedMaterialBatchKey, MeshBatch, RenderMaterials, RenderMeshes,
-        },
+            InstancedMaterialBatchKey, RenderMaterials, RenderMeshes,
+        }, systems::prepare_mesh_batches::MeshBatch,
     },
     render::instance::Instance,
 };
