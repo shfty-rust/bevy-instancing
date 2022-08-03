@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, Entity, Handle, Mesh, Query, Res, With},
+    prelude::{debug, default, Entity, Handle, Mesh, Query, Res, With, info},
     render::{
         renderer::RenderDevice,
         view::{ExtractedView, VisibleEntities},
@@ -16,9 +16,10 @@ use crate::instancing::{
         plugin::{
             GpuAlphaMode, GpuInstances, InstanceBatch, InstanceBatchKey, InstanceMeta,
             InstancedMaterialBatchKey, RenderMaterials, RenderMeshes,
-        }, systems::prepare_mesh_batches::MeshBatch,
+        },
+        systems::prepare_mesh_batches::MeshBatch,
     },
-    render::instance::Instance,
+    render::instance::{Instance, InstanceUniformLength},
 };
 
 use super::prepare_mesh_batches::MeshBatches;
@@ -169,22 +170,27 @@ pub fn system<M: MaterialInstanced>(
             for (key, instances) in keyed_instances.iter() {
                 debug!("{key:#?}");
                 // Collect instance data
-                let instance_buffer_data =
-                    instances
-                        .iter()
-                        .map(|((mesh_handle, _), (_, _, instance))| {
-                            let MeshBatch { meshes, .. } = mesh_batches.get(&key.mesh_key).unwrap();
+                let mut instance_buffer_data = instances
+                    .iter()
+                    .map(|((mesh_handle, _), (_, _, instance))| {
+                        let MeshBatch { meshes, .. } = mesh_batches.get(&key.mesh_key).unwrap();
 
-                            <M::Instance as Instance>::prepare_instance(
-                                instance,
-                                meshes.iter().position(|mesh| mesh == *mesh_handle).unwrap() as u32,
-                            )
-                        });
+                        <M::Instance as Instance>::prepare_instance(
+                            instance,
+                            meshes.iter().position(|mesh| mesh == *mesh_handle).unwrap() as u32,
+                        )
+                    })
+                    .collect::<Vec<_>>();
+
+                let min_length = <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH.get() as usize;
+                if instance_buffer_data.len() < min_length {
+                    instance_buffer_data.resize(min_length, default());
+                }
 
                 keyed_instance_buffer_data
                     .entry(key.clone())
                     .or_insert_with(gpu_instances)
-                    .push(instance_buffer_data.collect::<Vec<_>>());
+                    .set(instance_buffer_data);
             }
         });
 
@@ -238,7 +244,7 @@ pub fn system<M: MaterialInstanced>(
                     .entry(key.clone())
                     .or_insert_with(gpu_instances);
 
-                entry.push((0..instance_count).map(|_| default()).collect::<Vec<_>>());
+                entry.set((0..instance_count).map(|_| default()).collect::<Vec<_>>());
             }
         });
 

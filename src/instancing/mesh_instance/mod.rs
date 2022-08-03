@@ -22,13 +22,10 @@ pub struct MeshInstance {
 #[derive(Debug, Copy, Clone, ShaderType, Component)]
 pub struct GpuMeshInstance {
     #[size(4)]
-    #[align(16)]
     pub mesh: u32,
     #[size(64)]
-    #[align(16)]
     pub transform: Mat4,
     #[size(64)]
-    #[align(16)]
     pub inverse_transpose_model: Mat4,
 }
 

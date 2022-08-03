@@ -10,7 +10,7 @@ pub use crate::{
         },
         mesh_instance::{mesh_instance_bundle::*, *},
         plugin::*,
-        render::{instance::*, instanced_mesh_pipeline::*, set_instanced_mesh_bind_group::*, *},
+        render::{instance::*, instanced_mesh_pipeline::*, *},
         *,
     },
     materials::{

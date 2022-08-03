@@ -1,3 +1,5 @@
+FIXME: Instances draw incorrect mesh for uniform sub batches after the first one
+
 TODO: Optimization pass
       * Base indirect buffer can be generated during mesh batching,
         but needs to be duplicated and updated with counts + offsets for each instance batch
@@ -8,12 +10,11 @@ TODO: Optimization pass
 TODO: Specialized binding example for instance compute
       * Double-buffer instances for 3D boids
 
-TODO: Account for uniform buffer size limits
-      * Currently only binding one set of UNIFORM_MAX_INSTANCES-length instances
-      * Need to split instance batches by max size, spread across extra draw calls
-        * Should be transparent to bind group draw functions, direct / indirect draw invocation
-          * Thus, needs to be implemented by queueing additional batch entities
-            * Will need to split during prepare_batched_instances when indirect / instance data is prepared
+TODO: Investigate equivalent to babylon.js 'thin instances' functionality
+      * Similar to InstanceSlice; a contiguous block of instances that all draw together with no visibility culling
+      * Primary use case is wasm, needs a low-overhead solution to instancing in the absence of compute
+      * Use a variant of the regular component-based interface
+        * Minus the ComputedVisibility?
 
 TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances

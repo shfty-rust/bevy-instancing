@@ -26,16 +26,15 @@ const USE_SECOND_CAMERA: bool = false;
 fn main() {
     let mut app = App::default();
 
-    /*
     app.insert_resource(bevy::render::settings::WgpuSettings {
         disabled_features: Some(wgpu::Features::INDIRECT_FIRST_INSTANCE),
         constrained_limits: Some(wgpu::Limits {
             max_storage_buffers_per_shader_stage: 0,
+            max_uniform_buffer_binding_size: 16 << 10,
             ..default()
         }),
         ..default()
     });
-    */
 
     app.add_plugins(DefaultPlugins)
         .add_plugin(IndirectRenderingPlugin)
@@ -238,12 +237,11 @@ fn setup_instancing(
         material_texture_smiley,
     ];
 
-    let colors = &[
-        Color::rgba(1.0, 1.0, 1.0, 0.5),
-        Color::rgba(1.0, 0.0, 0.0, 0.5),
-        Color::rgba(0.0, 1.0, 0.0, 0.5),
-        Color::rgba(0.0, 0.0, 1.0, 0.5),
-    ];
+    let colors = (0..24)
+        .into_iter()
+        .map(|i| i as f32 / 16.0)
+        .map(|i| Color::hsla(i * 360.0, 1.0, 0.5, 0.5))
+        .collect::<Vec<_>>();
 
     for (x, mesh) in meshes.into_iter().enumerate() {
         commands
@@ -259,7 +257,7 @@ fn setup_instancing(
                 ..default()
             });
 
-        for (z, color) in colors.into_iter().copied().enumerate() {
+        for (z, color) in colors.iter().copied().enumerate() {
             let mut y = 0;
             for material in custom_materials.iter() {
                 commands

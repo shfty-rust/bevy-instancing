@@ -1,17 +1,14 @@
 use std::{collections::BTreeMap, num::NonZeroU64};
 
 use bevy::{
-    prelude::{debug, info_span, Entity, Handle, Mesh, Query, Res, With},
+    prelude::{debug, info, info_span, Entity, Handle, Mesh, Query, Res, With},
     render::{
-        mesh::Indices,
-        render_resource::{BufferVec, ShaderSize},
+        render_resource::{encase::CalculateSizeFor, BufferVec, ShaderSize},
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
     },
 };
-use wgpu::{
-    util::BufferInitDescriptor, BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages,
-};
+use wgpu::{BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages};
 
 use crate::instancing::{
     instance_slice::InstanceSlice,
@@ -20,10 +17,10 @@ use crate::instancing::{
         material_instanced::MaterialInstanced,
         plugin::{
             BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
-            InstanceMeta, RenderMeshes, MAX_UNIFORM_BUFFER_INSTANCES,
+            InstanceMeta, RenderMeshes,
         },
     },
-    render::instance::Instance,
+    render::instance::{Instance, InstanceUniformLength},
 };
 use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
 
@@ -242,52 +239,67 @@ pub fn system<M: MaterialInstanced>(
                     .write_buffer(&render_device, &render_queue);
             });
 
+            let mut batches = vec![];
+
             // Create bind group
-            let instance_bind_group = info_span!("Create bind group").in_scope(|| {
-                let uniform_binding_size = <[<M::Instance as Instance>::PreparedInstance;
-                    MAX_UNIFORM_BUFFER_INSTANCES] as ShaderSize>::SHADER_SIZE;
+            let instance_buffer_data = &instance_meta
+                .instance_batches
+                .get(&key)
+                .unwrap()
+                .instance_buffer_data;
 
-                let instance_buffer_data = &instance_meta
-                    .instance_batches
-                    .get(&key)
-                    .unwrap()
-                    .instance_buffer_data;
+            match instance_buffer_data {
+                crate::instancing::material::plugin::GpuInstances::Uniform { buffers } => {
+                    for (i, buffer) in buffers.into_iter().enumerate() {
+                        let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+                            label: Some("instance bind group"),
+                            layout: &instanced_material_pipeline
+                                .instanced_mesh_pipeline
+                                .bind_group_layout,
+                            entries: &[BindGroupEntry {
+                                binding: 0,
+                                resource: wgpu::BindingResource::Buffer(BufferBinding {
+                                    buffer: buffer.buffer().unwrap(),
+                                    offset: 0,
+                                    size: Some(
+                                        NonZeroU64::new(<M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH.get() * <M::Instance as Instance>::PreparedInstance::SHADER_SIZE.get()).unwrap(),
+                                    ),
+                                }),
+                            }],
+                        });
 
-                render_device.create_bind_group(&BindGroupDescriptor {
-                    label: Some("instance bind group"),
-                    layout: &instanced_material_pipeline
-                        .instanced_mesh_pipeline
-                        .bind_group_layout,
-                    entries: &[BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer(BufferBinding {
-                            buffer: instance_buffer_data.buffer().unwrap(),
-                            offset: 0,
-                            size: match instance_buffer_data {
-                                crate::instancing::material::plugin::GpuInstances::Uniform {
-                                    ..
-                                } => Some(uniform_binding_size),
-                                crate::instancing::material::plugin::GpuInstances::Storage {
-                                    ..
-                                } => None,
-                            },
-                        }),
-                    }],
-                })
-            });
+                        batches.push(BatchedInstances {
+                            vertex_buffer: vertex_buffer.clone(),
+                            index_buffer: index_buffer.clone(),
+                            indirect_buffer: indirect_buffer.clone(),
+                            bind_group,
+                        });
+                    }
+                }
+                crate::instancing::material::plugin::GpuInstances::Storage { buffer } => {
+                    let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+                        label: Some("instance bind group"),
+                        layout: &instanced_material_pipeline
+                            .instanced_mesh_pipeline
+                            .bind_group_layout,
+                        entries: &[BindGroupEntry {
+                            binding: 0,
+                            resource: buffer.binding().unwrap(),
+                        }],
+                    });
 
-            // Insert meta
-            info_span!("Insert meta").in_scope(|| {
-                instance_meta.batched_instances.insert(
-                    key.clone(),
-                    BatchedInstances {
+                    batches.push(BatchedInstances {
                         vertex_buffer,
                         index_buffer,
                         indirect_buffer,
-                        instance_bind_group,
-                    },
-                )
-            });
+                        bind_group,
+                    });
+                }
+            }
+
+            // Insert meta
+            info_span!("Insert meta")
+                .in_scope(|| instance_meta.batched_instances.insert(key.clone(), batches));
         }
     }
 }

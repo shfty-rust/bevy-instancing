@@ -1,4 +1,7 @@
-use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
+use crate::{
+    instancing::{mesh_instance::MeshInstance, render::instance::InstanceUniformLength},
+    prelude::{DrawIndexedIndirect, DrawIndirect},
+};
 use bevy::{
     app::{App, Plugin},
     asset::AddAsset,
@@ -24,8 +27,9 @@ use bevy::{
             TrackedRenderPass,
         },
         render_resource::{
-            AsBindGroupError, BindingResource, BufferBindingType, DynamicUniformBuffer,
-            IndexFormat, OwnedBindingResource, ShaderType, SpecializedMeshPipelines, StorageBuffer,
+            AsBindGroupError, BufferBindingType, IndexFormat,
+            OwnedBindingResource, ShaderType, SpecializedMeshPipelines, StorageBuffer,
+            UniformBuffer,
         },
         renderer::RenderQueue,
         texture::FallbackImage,
@@ -43,7 +47,7 @@ use bevy::{
 
 use crate::prelude::{
     extract_mesh_instances, Instance, InstanceSliceRange, InstancedMaterialPipeline,
-    MaterialInstanced, SetInstancedMaterialBindGroup, SetInstancedMeshBindGroup,
+    MaterialInstanced, SetInstancedMaterialBindGroup, 
 };
 
 use std::{
@@ -364,12 +368,12 @@ where
     }
 }
 
-pub const MAX_UNIFORM_BUFFER_INSTANCES: usize = 112;
+const MAX_UNIFORM_BUFFER_LENGTH: usize = MeshInstance::UNIFORM_BUFFER_LENGTH.get() as usize;
 
 pub enum GpuInstances<M: MaterialInstanced> {
     Uniform {
-        buffer: DynamicUniformBuffer<
-            [<M::Instance as Instance>::PreparedInstance; MAX_UNIFORM_BUFFER_INSTANCES],
+        buffers: Vec<
+            UniformBuffer<[<M::Instance as Instance>::PreparedInstance; MAX_UNIFORM_BUFFER_LENGTH]>,
         >,
     },
     Storage {
@@ -386,9 +390,7 @@ impl<M: MaterialInstanced> GpuInstances<M> {
     }
 
     pub fn uniform() -> Self {
-        Self::Uniform {
-            buffer: DynamicUniformBuffer::default(),
-        }
+        Self::Uniform { buffers: default() }
     }
 
     pub fn storage() -> Self {
@@ -399,56 +401,56 @@ impl<M: MaterialInstanced> GpuInstances<M> {
 
     pub fn clear(&mut self) {
         match self {
-            Self::Uniform { buffer } => buffer.clear(),
+            Self::Uniform { buffers } => buffers.clear(),
             Self::Storage { buffer } => buffer.get_mut().clear(),
         }
     }
 
-    pub fn buffer(&self) -> Option<&Buffer> {
-        match self {
-            Self::Uniform { buffer } => buffer.buffer(),
-            Self::Storage { buffer } => buffer.buffer(),
-        }
-    }
+    pub fn set(&mut self, instances: Vec<<M::Instance as Instance>::PreparedInstance>) {
+        self.clear();
 
-    pub fn push(&mut self, mut instances: Vec<<M::Instance as Instance>::PreparedInstance>) {
         match self {
-            Self::Uniform { buffer } => {
-                // NOTE: This iterator construction allows moving and padding with default
-                // values and is like this to avoid unnecessary cloning.
-                let gpu_instances = instances
-                    .drain(..)
-                    .chain(std::iter::repeat_with(default))
-                    .take(MAX_UNIFORM_BUFFER_INSTANCES)
-                    .collect::<Vec<_>>();
-                let gpu_instances = gpu_instances.try_into().unwrap();
-                buffer.push(gpu_instances);
+            Self::Uniform { buffers } => {
+                for chunk in instances.chunks(
+                    <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH.get() as usize,
+                ) {
+                    let mut buf: [<M::Instance as Instance>::PreparedInstance;
+                        MAX_UNIFORM_BUFFER_LENGTH] = vec![
+                            <M::Instance as Instance>::PreparedInstance::default();
+                            MAX_UNIFORM_BUFFER_LENGTH
+                        ]
+                    .try_into()
+                    .unwrap();
+
+                    for (i, instance) in chunk.into_iter().enumerate() {
+                        buf[i] = instance.clone();
+                    }
+
+                    let buf = UniformBuffer::from(buf);
+
+                    buffers.push(buf);
+                }
             }
             Self::Storage { buffer } => {
-                for instance in instances {
-                    buffer.get_mut().push(instance);
-                }
+                buffer.get_mut().extend(instances);
             }
         }
     }
 
     pub fn write_buffer(&mut self, render_device: &RenderDevice, render_queue: &RenderQueue) {
         match self {
-            Self::Uniform { buffer } => buffer.write_buffer(render_device, render_queue),
+            Self::Uniform { buffers } => {
+                for buffer in buffers {
+                    buffer.write_buffer(render_device, render_queue)
+                }
+            }
             Self::Storage { buffer } => buffer.write_buffer(render_device, render_queue),
-        }
-    }
-
-    pub fn binding(&self) -> Option<BindingResource> {
-        match self {
-            Self::Uniform { buffer } => buffer.binding(),
-            Self::Storage { buffer } => buffer.binding(),
         }
     }
 
     pub fn len(&self) -> usize {
         match self {
-            Self::Uniform { buffer } => buffer.len() * MAX_UNIFORM_BUFFER_INSTANCES,
+            Self::Uniform { .. } => 128,
             Self::Storage { buffer } => buffer.get().len(),
         }
     }
@@ -496,7 +498,7 @@ pub struct InstanceMeta<M: MaterialInstanced> {
     pub instances: Vec<Entity>,
     pub instance_slices: Vec<Entity>,
     pub instance_batches: BTreeMap<InstanceBatchKey<M>, InstanceBatch<M>>,
-    pub batched_instances: BTreeMap<InstanceBatchKey<M>, BatchedInstances>,
+    pub batched_instances: BTreeMap<InstanceBatchKey<M>, Vec<BatchedInstances>>,
 }
 
 impl<M: MaterialInstanced> Default for InstanceMeta<M> {
@@ -510,6 +512,7 @@ impl<M: MaterialInstanced> Default for InstanceMeta<M> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum GpuIndirectBufferData {
     Indexed {
         indirects: Vec<DrawIndexedIndirect>,
@@ -550,14 +553,13 @@ pub struct BatchedInstances {
     pub vertex_buffer: Buffer,
     pub index_buffer: Option<(Buffer, IndexFormat)>,
     pub indirect_buffer: GpuIndirectBufferData,
-    pub instance_bind_group: BindGroup,
+    pub bind_group: BindGroup,
 }
 
 pub type DrawInstanced<M> = (
     SetItemPipeline,
     SetMeshViewBindGroup<0>,
     SetInstancedMaterialBindGroup<M, 1>,
-    SetInstancedMeshBindGroup<M, 2>,
     DrawBatchedInstances<M>,
 );
 
@@ -589,80 +591,86 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
             .get(query_instance_batch_key.get(item).unwrap())
             .unwrap();
 
-        pass.set_vertex_buffer(0, batched_instances.vertex_buffer.slice(..));
 
-        match &batched_instances.index_buffer {
-            Some((index_buffer, index_format)) => {
-                pass.set_index_buffer(index_buffer.slice(..), 0, *index_format);
+        for (i, batch) in batched_instances.into_iter().enumerate() {
+            info!("Batch sub-index {i:}");
+            pass.set_bind_group(2, &batch.bind_group, &[]);
 
-                for (i, indirect) in batched_instances
-                    .indirect_buffer
-                    .indexed_indirects()
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                {
-                    if render_device
-                        .features()
-                        .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+            pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
+
+            match &batch.index_buffer {
+                Some((index_buffer, index_format)) => {
+                    pass.set_index_buffer(index_buffer.slice(..), 0, *index_format);
+
+                    for (i, indirect) in batch
+                        .indirect_buffer
+                        .indexed_indirects()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
                     {
-                        debug!("Drawing indexed indirect {i:?}: {indirect:#?}");
+                        if render_device
+                            .features()
+                            .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                        {
+                            debug!("Drawing indexed indirect {i:?}: {indirect:#?}");
 
-                        pass.draw_indexed_indirect(
-                            batched_instances.indirect_buffer.buffer(),
-                            (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
-                        );
-                    } else {
-                        debug!("Drawing indexed direct {i:?}: {indirect:#?}");
+                            pass.draw_indexed_indirect(
+                                batch.indirect_buffer.buffer(),
+                                (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
+                            );
+                        } else {
+                            debug!("Drawing indexed direct {i:?}: {indirect:#?}");
 
-                        let DrawIndexedIndirect {
-                            vertex_count,
-                            instance_count,
-                            base_index,
-                            vertex_offset,
-                            base_instance,
-                        } = *indirect;
+                            let DrawIndexedIndirect {
+                                vertex_count,
+                                instance_count,
+                                base_index,
+                                vertex_offset,
+                                base_instance,
+                            } = *indirect;
 
-                        pass.draw_indexed(
-                            base_index..base_index + vertex_count,
-                            vertex_offset,
-                            base_instance..base_instance + instance_count,
-                        );
+                            pass.draw_indexed(
+                                base_index..base_index + vertex_count,
+                                vertex_offset,
+                                base_instance..base_instance + instance_count,
+                            );
+                        }
                     }
                 }
-            }
-            None => {
-                for (i, indirect) in batched_instances
-                    .indirect_buffer
-                    .indirects()
-                    .unwrap()
-                    .iter()
-                    .enumerate()
-                {
-                    if render_device
-                        .features()
-                        .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                None => {
+                    for (i, indirect) in batch
+                        .indirect_buffer
+                        .indirects()
+                        .unwrap()
+                        .iter()
+                        .enumerate()
                     {
-                        debug!("Drawing indirect {i:?}: {indirect:#?}");
+                        if render_device
+                            .features()
+                            .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                        {
+                            debug!("Drawing indirect {i:?}: {indirect:#?}");
 
-                        pass.draw_indirect(
-                            batched_instances.indirect_buffer.buffer(),
-                            (i * std::mem::size_of::<DrawIndirect>()) as u64,
-                        );
-                    } else {
-                        info!("Drawing direct {i:?}: {indirect:#?}");
+                            pass.draw_indirect(
+                                batch.indirect_buffer.buffer(),
+                                (i * std::mem::size_of::<DrawIndirect>()) as u64,
+                            );
+                        } else {
+                            info!("Drawing direct {i:?}: {indirect:#?}");
 
-                        let DrawIndirect {
-                            vertex_count,
-                            instance_count,
-                            base_vertex,
-                            base_instance,
-                        } = *indirect;
+                            let DrawIndirect {
+                                vertex_count,
+                                instance_count,
+                                base_vertex,
+                                base_instance,
+                            } = *indirect;
 
-                        pass.draw(
-                            base_vertex..base_vertex + vertex_count,
-                            base_instance..base_instance + instance_count,
-                        );
+                            pass.draw(
+                                base_vertex..base_vertex + vertex_count,
+                                base_instance..base_instance + instance_count,
+                            );
+                        }
                     }
                 }
             }

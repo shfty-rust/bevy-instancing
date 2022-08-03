@@ -5,14 +5,14 @@ use bevy::{
 
 use crate::instancing::{
     instance_slice::InstanceSliceTarget,
-    material::{material_instanced::MaterialInstanced, plugin::InstanceMeta},
+    material::{
+        material_instanced::MaterialInstanced,
+        plugin::{GpuInstances, InstanceMeta},
+    },
 };
 
 pub fn system<M: MaterialInstanced>(
-    query_views: Query<
-        (Entity, &InstanceMeta<M>),
-        (With<ExtractedView>, With<VisibleEntities>),
-    >,
+    query_views: Query<(Entity, &InstanceMeta<M>), (With<ExtractedView>, With<VisibleEntities>)>,
     mut commands: Commands,
 ) {
     for (view_entity, instance_meta) in query_views.iter() {
@@ -29,15 +29,16 @@ pub fn system<M: MaterialInstanced>(
                 commands.entity(*entity).insert_bundle((
                     *slice_range,
                     InstanceSliceTarget {
-                        buffer: instance_batch
-                            .instance_buffer_data
-                            .buffer()
-                            .cloned()
-                            .unwrap(),
+                        buffer: if let GpuInstances::Storage { buffer } =
+                            &instance_batch.instance_buffer_data
+                        {
+                            buffer.buffer().unwrap().clone()
+                        } else {
+                            panic!("InstanceSlice cannot be used with non-storage buffers")
+                        },
                     },
                 ));
             }
         }
     }
 }
-
