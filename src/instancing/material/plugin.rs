@@ -555,11 +555,9 @@ impl GpuIndirectBufferData {
 #[derive(Component)]
 pub struct BatchedInstances {
     pub vertex_buffer: Buffer,
-    pub index_data: Option<(Buffer, IndexFormat)>,
+    pub index_buffer: Option<(Buffer, IndexFormat)>,
     pub indirect_buffer: GpuIndirectBufferData,
     pub instance_bind_group: BindGroup,
-    pub indirect_count: usize,
-    pub indirect_indices: Vec<usize>,
 }
 
 pub type DrawInstanced<M> = (
@@ -600,35 +598,29 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
 
         pass.set_vertex_buffer(0, batched_instances.vertex_buffer.slice(..));
 
-        match &batched_instances.index_data {
+        match &batched_instances.index_buffer {
             Some((index_buffer, index_format)) => {
                 pass.set_index_buffer(index_buffer.slice(..), 0, *index_format);
 
-                if render_device
-                    .features()
-                    .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                for (i, indirect) in batched_instances
+                    .indirect_buffer
+                    .indexed_indirects()
+                    .unwrap()
+                    .iter()
+                    .enumerate()
                 {
-                    for i in &batched_instances.indirect_indices {
-                        let indirect = batched_instances
-                            .indirect_buffer
-                            .indexed_indirects()
-                            .unwrap()[*i];
-
+                    if render_device
+                        .features()
+                        .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                    {
                         debug!("Drawing indexed indirect {i:?}: {indirect:#?}");
 
                         pass.draw_indexed_indirect(
                             batched_instances.indirect_buffer.buffer().unwrap(),
                             (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
                         );
-                    }
-                } else {
-                    for i in &batched_instances.indirect_indices {
-                        let indirect = batched_instances
-                            .indirect_buffer
-                            .indexed_indirects()
-                            .unwrap()[*i];
-
-                        debug!("Drawing direct {i:?}: {indirect:#?}");
+                    } else {
+                        debug!("Drawing indexed direct {i:?}: {indirect:#?}");
 
                         let DrawIndexedIndirect {
                             vertex_count,
@@ -636,7 +628,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                             base_index,
                             vertex_offset,
                             base_instance,
-                        } = indirect;
+                        } = *indirect;
 
                         pass.draw_indexed(
                             base_index..base_index + vertex_count,
@@ -647,22 +639,24 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                 }
             }
             None => {
-                if render_device
-                    .features()
-                    .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                for (i, indirect) in batched_instances
+                    .indirect_buffer
+                    .indirects()
+                    .unwrap()
+                    .iter()
+                    .enumerate()
                 {
-                    for i in &batched_instances.indirect_indices {
-                        let indirect = batched_instances.indirect_buffer.indirects().unwrap()[*i];
+                    if render_device
+                        .features()
+                        .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                    {
                         debug!("Drawing indirect {i:?}: {indirect:#?}");
 
                         pass.draw_indirect(
                             batched_instances.indirect_buffer.buffer().unwrap(),
                             (i * std::mem::size_of::<DrawIndirect>()) as u64,
                         );
-                    }
-                } else {
-                    for i in &batched_instances.indirect_indices {
-                        let indirect = batched_instances.indirect_buffer.indirects().unwrap()[*i];
+                    } else {
                         info!("Drawing direct {i:?}: {indirect:#?}");
 
                         let DrawIndirect {
@@ -670,7 +664,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                             instance_count,
                             base_vertex,
                             base_instance,
-                        } = indirect;
+                        } = *indirect;
 
                         pass.draw(
                             base_vertex..base_vertex + vertex_count,

@@ -64,7 +64,6 @@ pub fn system<M: MaterialInstanced>(
 
             // Fetch data
             let mesh_batch = mesh_batches.get(&key.mesh_key).unwrap();
-            let indirect_count = mesh_batch.indirect_data.len();
 
             // Calculate mesh instance counts for this batch
             let mesh_instance_counts = info_span!("Mesh instance counts").in_scope(|| {
@@ -157,13 +156,17 @@ pub fn system<M: MaterialInstanced>(
                                         .zip(mesh_instance_offsets.values()),
                                 ),
                             )
-                            .map(
+                            .flat_map(
                                 |(indirect, (instance_count, (index_offset, instance_offset)))| {
-                                    DrawIndexedIndirect {
-                                        instance_count: *instance_count as u32,
-                                        base_index: *index_offset as u32,
-                                        base_instance: *instance_offset as u32,
-                                        ..indirect
+                                    if *instance_count > 0 {
+                                        Some(DrawIndexedIndirect {
+                                            instance_count: *instance_count as u32,
+                                            base_index: *index_offset as u32,
+                                            base_instance: *instance_offset as u32,
+                                            ..indirect
+                                        })
+                                    } else {
+                                        None
                                     }
                                 },
                             )
@@ -214,17 +217,6 @@ pub fn system<M: MaterialInstanced>(
                     }
                 });
 
-            // Calculate indirect indices
-            let indirect_indices = info_span!("Indirect indices").in_scope(|| {
-                mesh_instance_counts
-                    .iter()
-                    .enumerate()
-                    .flat_map(|(i, (_, count))| if *count > 0 { Some(i) } else { None })
-                    .collect::<Vec<_>>()
-            });
-
-            debug!("Indirect indices: {indirect_indices:#?}");
-
             // Write buffers
             info_span!("Write buffers").in_scope(|| {
                 instance_meta
@@ -263,12 +255,10 @@ pub fn system<M: MaterialInstanced>(
                     key.clone(),
                     BatchedInstances {
                         vertex_buffer,
-                        index_data: index_buffer
+                        index_buffer: index_buffer
                             .map(|index_buffer| (index_buffer, key.mesh_key.index_format.unwrap())),
-                        instance_bind_group,
                         indirect_buffer,
-                        indirect_count,
-                        indirect_indices,
+                        instance_bind_group,
                     },
                 )
             });
