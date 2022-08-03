@@ -58,7 +58,7 @@ use std::{
 use std::marker::PhantomData;
 
 use super::systems::{
-    extract_instanced_meshes, extract_instanced_view_meta, prepare_batched_instances,
+    extract_instanced_meshes, extract_instanced_view_meta, prepare_batched_instances::{self, ViewIndirectData},
     prepare_instance_batches::{self, ViewInstanceData},
     prepare_instance_slice_targets,
     prepare_material_batches::{self, MaterialBatches},
@@ -98,6 +98,7 @@ where
                 .init_resource::<MaterialBatches<M>>()
                 .init_resource::<MaterialBatches<M>>()
                 .init_resource::<ViewInstanceData<M>>()
+                .init_resource::<ViewIndirectData<M>>()
                 .init_resource::<SpecializedMeshPipelines<InstancedMaterialPipeline<M>>>()
                 .add_system_to_stage(RenderStage::Extract, extract_materials::<M>)
                 .add_system_to_stage(RenderStage::Extract, extract_mesh_instances::<M>)
@@ -594,7 +595,6 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
             .unwrap();
 
         for (i, batch) in batched_instances.into_iter().enumerate() {
-            info!("Batch sub-index {i:}");
             pass.set_bind_group(2, &batch.bind_group, &[]);
 
             pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));

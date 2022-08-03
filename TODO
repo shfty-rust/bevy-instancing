@@ -1,12 +1,5 @@
 FIXME: Instances draw incorrect mesh for uniform sub batches after the first one
 
-TODO: Optimization pass
-      * Base indirect buffer can be generated during mesh batching,
-        but needs to be duplicated and updated with counts + offsets for each instance batch
-        * Per-batch indirect buffers should live as a BufferVec in a resource, update by batch key
-      * Instance buffer needs to be updated each frame,
-        but can live as a BufferVec in a resource for the sake of reusing GPU primitives
-
 TODO: Specialized binding example for instance compute
       * Double-buffer instances for 3D boids
 
@@ -25,9 +18,9 @@ FIXME: Instance buffer layout is incorrect under wasm
        * Instances draw, but with incorrect positions
        * Instance buffer appears to be excessively padded
          * Manually drawing instances 0..64 for each indirect reveals that all the transform data is there,
-           but at 10-instance-wide intervals instead of the expected 1-instance-wide
+           but at unexpectedly wide intervals instead of the expected 1-instance-wide
          * Experimented with explicitly specifying struct size and alignment, but makes no difference
-         * Likely some unaccounted-for wgpu feature or limit
+         * Likely some unaccounted-for wgpu limit
 
 NOTES: Transparency ordering
       * Currently, transparency ordering is only correct versus other instances with the

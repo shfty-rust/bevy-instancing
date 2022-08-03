@@ -213,8 +213,6 @@ pub fn system<M: MaterialInstanced>(
 
         let span = bevy::prelude::info_span!("Create instance slice ranges");
         let mut keyed_instance_slice_ranges = span.in_scope(|| {
-            let view_instance_data = view_instance_data.entry(view_entity).or_default();
-
             debug!("Creating instance slice ranges");
             // Create instance slice ranges
             keyed_instance_slices

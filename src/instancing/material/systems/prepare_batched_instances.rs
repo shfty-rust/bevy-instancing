@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, num::NonZeroU64};
 
 use bevy::{
-    prelude::{debug, info_span, Entity, Handle, Mesh, Query, Res, With},
+    prelude::{debug, default, info_span, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, With, ResMut},
     render::{
         render_resource::{BufferVec, ShaderSize},
         renderer::{RenderDevice, RenderQueue},
@@ -17,7 +17,7 @@ use crate::instancing::{
         material_instanced::MaterialInstanced,
         plugin::{
             BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
-            InstanceMeta, RenderMeshes,
+            InstanceBatchKey, InstanceMeta, RenderMeshes,
         },
     },
     render::instance::{Instance, InstanceUniformLength},
@@ -25,6 +25,19 @@ use crate::instancing::{
 use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
 
 use super::{prepare_instance_batches::ViewInstanceData, prepare_mesh_batches::MeshBatches};
+
+#[derive(Deref, DerefMut)]
+pub struct ViewIndirectData<M: MaterialInstanced> {
+    pub indirect_data: BTreeMap<Entity, BTreeMap<InstanceBatchKey<M>, BufferVec<u8>>>,
+}
+
+impl<M: MaterialInstanced> Default for ViewIndirectData<M> {
+    fn default() -> Self {
+        Self {
+            indirect_data: default(),
+        }
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 pub fn system<M: MaterialInstanced>(
@@ -34,6 +47,7 @@ pub fn system<M: MaterialInstanced>(
     render_queue: Res<RenderQueue>,
     mesh_batches: Res<MeshBatches>,
     view_instance_data: Res<ViewInstanceData<M>>,
+    mut view_indirect_data: ResMut<ViewIndirectData<M>>,
     query_instance: Query<(
         Entity,
         &Handle<M>,
@@ -54,6 +68,7 @@ pub fn system<M: MaterialInstanced>(
         debug!("\tView {view_entity:?}");
 
         let view_instance_data = view_instance_data.get(&view_entity).unwrap();
+        let view_indirect_data = view_indirect_data.entry(view_entity).or_default();
 
         // Process batches
         for key in instance_meta
@@ -147,8 +162,11 @@ pub fn system<M: MaterialInstanced>(
             });
 
             // Build indirect buffer
-            let mut indirect_buffer = BufferVec::new(BufferUsages::INDIRECT);
-            let indirect_buffer =
+            let indirect_buffer = view_indirect_data
+                .entry(key.clone())
+                .or_insert_with(|| BufferVec::new(BufferUsages::INDIRECT | BufferUsages::COPY_DST));
+
+            let indirect_buffer_data =
                 info_span!("Create indirect buffer").in_scope(|| match &mesh_batch.indirect_data {
                     GpuIndirectData::Indexed { buffer } => {
                         let indirect_data = buffer
@@ -179,7 +197,7 @@ pub fn system<M: MaterialInstanced>(
 
                         let bytes: Vec<u8> = bytemuck::cast_slice(&indirect_data).to_vec();
 
-                        indirect_buffer.reserve(bytes.len(), &render_device);
+                        indirect_buffer.clear();
 
                         for byte in bytes {
                             indirect_buffer.push(byte);
@@ -217,7 +235,7 @@ pub fn system<M: MaterialInstanced>(
 
                         let bytes: Vec<u8> = bytemuck::cast_slice(&indirect_data).to_vec();
 
-                        indirect_buffer.reserve(bytes.len(), &render_device);
+                        indirect_buffer.clear();
 
                         for byte in bytes {
                             indirect_buffer.push(byte);
@@ -260,7 +278,7 @@ pub fn system<M: MaterialInstanced>(
                         batches.push(BatchedInstances {
                             vertex_buffer: vertex_buffer.clone(),
                             index_buffer: index_buffer.clone(),
-                            indirect_buffer: indirect_buffer.clone(),
+                            indirect_buffer: indirect_buffer_data.clone(),
                             bind_group,
                         });
                     }
@@ -280,7 +298,7 @@ pub fn system<M: MaterialInstanced>(
                     batches.push(BatchedInstances {
                         vertex_buffer,
                         index_buffer,
-                        indirect_buffer,
+                        indirect_buffer: indirect_buffer_data,
                         bind_group,
                     });
                 }
