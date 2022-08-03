@@ -237,10 +237,13 @@ fn setup_instancing(
         material_texture_smiley,
     ];
 
-    let colors = (0..24)
-        .into_iter()
-        .map(|i| i as f32 / 16.0)
-        .map(|i| Color::hsla(i * 360.0, 1.0, 0.5, 0.5))
+    let colors = std::iter::once(Color::rgba(1.0, 1.0, 1.0, 0.5))
+        .chain(
+            (0..24)
+                .into_iter()
+                .map(|i| i as f32 / 16.0)
+                .map(|i| Color::hsla(i * 360.0, 1.0, 0.5, 0.5)),
+        )
         .collect::<Vec<_>>();
 
     for (x, mesh) in meshes.into_iter().enumerate() {

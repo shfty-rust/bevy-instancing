@@ -27,9 +27,8 @@ use bevy::{
             TrackedRenderPass,
         },
         render_resource::{
-            AsBindGroupError, BufferBindingType, IndexFormat,
-            OwnedBindingResource, ShaderType, SpecializedMeshPipelines, StorageBuffer,
-            UniformBuffer,
+            AsBindGroupError, BufferBindingType, IndexFormat, OwnedBindingResource, ShaderType,
+            SpecializedMeshPipelines, StorageBuffer, UniformBuffer,
         },
         renderer::RenderQueue,
         texture::FallbackImage,
@@ -47,7 +46,7 @@ use bevy::{
 
 use crate::prelude::{
     extract_mesh_instances, Instance, InstanceSliceRange, InstancedMaterialPipeline,
-    MaterialInstanced, SetInstancedMaterialBindGroup, 
+    MaterialInstanced, SetInstancedMaterialBindGroup,
 };
 
 use std::{
@@ -60,7 +59,8 @@ use std::marker::PhantomData;
 
 use super::systems::{
     extract_instanced_meshes, extract_instanced_view_meta, prepare_batched_instances,
-    prepare_instance_batches, prepare_instance_slice_targets,
+    prepare_instance_batches::{self, ViewInstanceData},
+    prepare_instance_slice_targets,
     prepare_material_batches::{self, MaterialBatches},
     prepare_mesh_batches, prepare_view_instance_slices, prepare_view_instances,
     queue_instanced_materials,
@@ -96,6 +96,8 @@ where
                 .init_resource::<RenderMeshes>()
                 .init_resource::<RenderMaterials<M>>()
                 .init_resource::<MaterialBatches<M>>()
+                .init_resource::<MaterialBatches<M>>()
+                .init_resource::<ViewInstanceData<M>>()
                 .init_resource::<SpecializedMeshPipelines<InstancedMaterialPipeline<M>>>()
                 .add_system_to_stage(RenderStage::Extract, extract_materials::<M>)
                 .add_system_to_stage(RenderStage::Extract, extract_mesh_instances::<M>)
@@ -463,7 +465,7 @@ impl<M: MaterialInstanced> GpuInstances<M> {
 pub struct InstanceBatch<M: MaterialInstanced> {
     pub instances: BTreeSet<Entity>,
     pub instance_slice_ranges: BTreeMap<Entity, InstanceSliceRange>,
-    pub instance_buffer_data: GpuInstances<M>,
+    pub _phantom: PhantomData<M>,
 }
 
 impl<M: MaterialInstanced> Debug for InstanceBatch<M> {
@@ -590,7 +592,6 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
             .batched_instances
             .get(query_instance_batch_key.get(item).unwrap())
             .unwrap();
-
 
         for (i, batch) in batched_instances.into_iter().enumerate() {
             info!("Batch sub-index {i:}");

@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, Entity, Handle, Mesh, Query, Res, With, info},
+    prelude::{debug, default, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut, With},
     render::{
-        renderer::RenderDevice,
+        renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
     },
     utils::FloatOrd,
@@ -24,11 +24,26 @@ use crate::instancing::{
 
 use super::prepare_mesh_batches::MeshBatches;
 
+#[derive(Deref, DerefMut)]
+pub struct ViewInstanceData<M: MaterialInstanced> {
+    pub instance_data: BTreeMap<Entity, BTreeMap<InstanceBatchKey<M>, GpuInstances<M>>>,
+}
+
+impl<M: MaterialInstanced> Default for ViewInstanceData<M> {
+    fn default() -> Self {
+        Self {
+            instance_data: default(),
+        }
+    }
+}
+
 pub fn system<M: MaterialInstanced>(
     render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
     render_meshes: Res<RenderMeshes>,
     render_materials: Res<RenderMaterials<M>>,
     mesh_batches: Res<MeshBatches>,
+    mut view_instance_data: ResMut<ViewInstanceData<M>>,
     mut query_views: Query<(Entity, &ExtractedView, &mut InstanceMeta<M>), With<VisibleEntities>>,
     query_instance: Query<(
         Entity,
@@ -156,12 +171,13 @@ pub fn system<M: MaterialInstanced>(
             keyed_instance_slices.values()
         );
 
-        // Create an instance buffer vec for each key
-        let mut keyed_instance_buffer_data =
-            BTreeMap::<InstanceBatchKey<M>, GpuInstances<M>>::new();
-
+        // Create instance buffer data
         let gpu_instances =
             || GpuInstances::new(render_device.get_supported_read_only_binding_type(1));
+
+        let mut instance_buffer_data =
+            BTreeMap::<InstanceBatchKey<M>, Vec<<M::Instance as Instance>::PreparedInstance>>::new(
+            );
 
         let span = bevy::prelude::info_span!("Populate instances");
         span.in_scope(|| {
@@ -170,7 +186,7 @@ pub fn system<M: MaterialInstanced>(
             for (key, instances) in keyed_instances.iter() {
                 debug!("{key:#?}");
                 // Collect instance data
-                let mut instance_buffer_data = instances
+                let mut data = instances
                     .iter()
                     .map(|((mesh_handle, _), (_, _, instance))| {
                         let MeshBatch { meshes, .. } = mesh_batches.get(&key.mesh_key).unwrap();
@@ -182,29 +198,30 @@ pub fn system<M: MaterialInstanced>(
                     })
                     .collect::<Vec<_>>();
 
-                let min_length = <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH.get() as usize;
+                let min_length =
+                    <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH.get() as usize;
                 if instance_buffer_data.len() < min_length {
-                    instance_buffer_data.resize(min_length, default());
+                    data.resize(min_length, default());
                 }
 
-                keyed_instance_buffer_data
+                instance_buffer_data
                     .entry(key.clone())
-                    .or_insert_with(gpu_instances)
-                    .set(instance_buffer_data);
+                    .or_default()
+                    .extend(data);
             }
         });
 
         let span = bevy::prelude::info_span!("Create instance slice ranges");
         let mut keyed_instance_slice_ranges = span.in_scope(|| {
+            let view_instance_data = view_instance_data.entry(view_entity).or_default();
+
             debug!("Creating instance slice ranges");
             // Create instance slice ranges
             keyed_instance_slices
                 .iter()
                 .map(|(key, instance_slices)| {
-                    let instance_buffer_data_len = keyed_instance_buffer_data
-                        .get(&key)
-                        .map(GpuInstances::len)
-                        .unwrap_or_default();
+                    let instance_buffer_data_len =
+                        instance_buffer_data.entry(key.clone()).or_default().len();
 
                     // Collect CPU instance slice data
                     let mut offset = instance_buffer_data_len;
@@ -240,44 +257,49 @@ pub fn system<M: MaterialInstanced>(
                     .map(|(_, _, instance_slice)| instance_slice.instance_count)
                     .sum();
 
-                let entry = keyed_instance_buffer_data
+                instance_buffer_data
                     .entry(key.clone())
-                    .or_insert_with(gpu_instances);
-
-                entry.set((0..instance_count).map(|_| default()).collect::<Vec<_>>());
+                    .or_default()
+                    .extend((0..instance_count).map(|_| default()));
             }
         });
+
+        let view_instance_data = view_instance_data.entry(view_entity).or_default();
+        for (key, instance_buffer_data) in instance_buffer_data {
+            let entry = view_instance_data.entry(key).or_insert_with(gpu_instances);
+
+            entry.set(instance_buffer_data);
+            entry.write_buffer(&render_device, &render_queue);
+        }
 
         let span = bevy::prelude::info_span!("Write instance batches");
         span.in_scope(|| {
             // Write instance batches to meta
             instance_meta
                 .instance_batches
-                .extend(keyed_instance_buffer_data.into_iter().map(
-                    |(key, instance_buffer_data)| {
-                        let instances = keyed_instances
-                            .remove(&key)
-                            .map(|instances| {
-                                instances
-                                    .into_iter()
-                                    .map(|((_, _), (instance, _, _))| instance)
-                                    .collect::<BTreeSet<_>>()
-                            })
-                            .unwrap_or_default();
+                .extend(view_instance_data.keys().map(|key| {
+                    let instances = keyed_instances
+                        .remove(key)
+                        .map(|instances| {
+                            instances
+                                .into_iter()
+                                .map(|((_, _), (instance, _, _))| instance)
+                                .collect::<BTreeSet<_>>()
+                        })
+                        .unwrap_or_default();
 
-                        let instance_slice_ranges =
-                            keyed_instance_slice_ranges.remove(&key).unwrap_or_default();
+                    let instance_slice_ranges =
+                        keyed_instance_slice_ranges.remove(&key).unwrap_or_default();
 
-                        (
-                            key.clone(),
-                            InstanceBatch::<M> {
-                                instances,
-                                instance_slice_ranges,
-                                instance_buffer_data,
-                            },
-                        )
-                    },
-                ));
+                    (
+                        key.clone(),
+                        InstanceBatch::<M> {
+                            instances,
+                            instance_slice_ranges,
+                            _phantom: default(),
+                        },
+                    )
+                }));
         });
     }
 }

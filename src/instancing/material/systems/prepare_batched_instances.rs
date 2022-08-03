@@ -1,9 +1,9 @@
 use std::{collections::BTreeMap, num::NonZeroU64};
 
 use bevy::{
-    prelude::{debug, info, info_span, Entity, Handle, Mesh, Query, Res, With},
+    prelude::{debug, info_span, Entity, Handle, Mesh, Query, Res, With},
     render::{
-        render_resource::{encase::CalculateSizeFor, BufferVec, ShaderSize},
+        render_resource::{BufferVec, ShaderSize},
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
     },
@@ -24,7 +24,7 @@ use crate::instancing::{
 };
 use crate::prelude::{DrawIndexedIndirect, DrawIndirect};
 
-use super::prepare_mesh_batches::MeshBatches;
+use super::{prepare_instance_batches::ViewInstanceData, prepare_mesh_batches::MeshBatches};
 
 #[allow(clippy::too_many_arguments)]
 pub fn system<M: MaterialInstanced>(
@@ -33,6 +33,7 @@ pub fn system<M: MaterialInstanced>(
     render_device: Res<RenderDevice>,
     render_queue: Res<RenderQueue>,
     mesh_batches: Res<MeshBatches>,
+    view_instance_data: Res<ViewInstanceData<M>>,
     query_instance: Query<(
         Entity,
         &Handle<M>,
@@ -51,6 +52,8 @@ pub fn system<M: MaterialInstanced>(
 
     for (view_entity, mut instance_meta) in query_views.iter_mut() {
         debug!("\tView {view_entity:?}");
+
+        let view_instance_data = view_instance_data.get(&view_entity).unwrap();
 
         // Process batches
         for key in instance_meta
@@ -229,24 +232,10 @@ pub fn system<M: MaterialInstanced>(
                     }
                 });
 
-            // Write instance buffer
-            info_span!("Write instance buffers").in_scope(|| {
-                instance_meta
-                    .instance_batches
-                    .get_mut(&key)
-                    .unwrap()
-                    .instance_buffer_data
-                    .write_buffer(&render_device, &render_queue);
-            });
-
             let mut batches = vec![];
 
             // Create bind group
-            let instance_buffer_data = &instance_meta
-                .instance_batches
-                .get(&key)
-                .unwrap()
-                .instance_buffer_data;
+            let instance_buffer_data = view_instance_data.get(&key).unwrap();
 
             match instance_buffer_data {
                 crate::instancing::material::plugin::GpuInstances::Uniform { buffers } => {
