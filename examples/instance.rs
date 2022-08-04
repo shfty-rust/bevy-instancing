@@ -26,6 +26,7 @@ const USE_SECOND_CAMERA: bool = false;
 fn main() {
     let mut app = App::default();
 
+    /*
     app.insert_resource(bevy::render::settings::WgpuSettings {
         disabled_features: Some(wgpu::Features::INDIRECT_FIRST_INSTANCE),
         constrained_limits: Some(wgpu::Limits {
@@ -35,6 +36,7 @@ fn main() {
         }),
         ..default()
     });
+    */
 
     app.add_plugins(DefaultPlugins)
         .add_plugin(IndirectRenderingPlugin)
@@ -72,7 +74,7 @@ fn setup_instancing(
     // main camera
     commands.spawn_bundle(Camera3dBundle {
         transform: Transform::from_xyz(-50.0, 50.0, 50.0)
-            .looking_at(Vec3::new(0.0, 12.0, 0.0), Vec3::Y),
+            .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
         projection: Projection::Perspective(PerspectiveProjection {
             fov: 15.0f32.to_radians(),
             ..default()
@@ -140,6 +142,11 @@ fn setup_instancing(
     );
 
     let meshes = [
+        mesh_cube.clone(),
+        mesh_quad.clone(),
+        mesh_icosphere.clone(),
+        mesh_uv_sphere.clone(),
+        mesh_torus.clone(),
         mesh_cube,
         mesh_quad,
         mesh_icosphere,
@@ -259,6 +266,7 @@ fn setup_instancing(
                 },
                 ..default()
             });
+        //.insert(NoFrustumCulling);
 
         for (z, color) in colors.iter().copied().enumerate() {
             let mut y = 0;
@@ -283,6 +291,7 @@ fn setup_instancing(
                         },
                         mesh_instance_color: color.into(),
                     });
+                //.insert(NoFrustumCulling);
 
                 y += 1;
             }
@@ -308,6 +317,7 @@ fn setup_instancing(
                         },
                         mesh_instance_color: color.into(),
                     });
+                //.insert(NoFrustumCulling);
 
                 y += 1;
             }

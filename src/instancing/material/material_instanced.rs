@@ -52,6 +52,7 @@ pub trait MaterialInstanced:
     }
 
     /// Specializes the given `descriptor` according to the given `key`.
+    #[allow(unused_variables)]
     fn specialize(
         pipeline: &InstancedMaterialPipeline<Self>,
         descriptor: &mut RenderPipelineDescriptor,

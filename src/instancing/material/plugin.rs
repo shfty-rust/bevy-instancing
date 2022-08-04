@@ -58,7 +58,8 @@ use std::{
 use std::marker::PhantomData;
 
 use super::systems::{
-    extract_instanced_meshes, extract_instanced_view_meta, prepare_batched_instances::{self, ViewIndirectData},
+    extract_instanced_meshes, extract_instanced_view_meta,
+    prepare_batched_instances::{self, ViewIndirectData},
     prepare_instance_batches::{self, ViewInstanceData},
     prepare_instance_slice_targets,
     prepare_material_batches::{self, MaterialBatches},
@@ -453,7 +454,7 @@ impl<M: MaterialInstanced> GpuInstances<M> {
 
     pub fn len(&self) -> usize {
         match self {
-            Self::Uniform { .. } => 128,
+            Self::Uniform { buffers } => buffers.len() * 128,
             Self::Storage { buffer } => buffer.get().len(),
         }
     }
@@ -586,7 +587,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
         >,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        debug!("DrawInstanceBatch {item:?}");
+        info!("DrawInstanceBatch {item:?}");
         let batched_instances = instance_meta
             .get_inner(view)
             .unwrap()
@@ -595,6 +596,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
             .unwrap();
 
         for (i, batch) in batched_instances.into_iter().enumerate() {
+            info!("Batch {}", i);
             pass.set_bind_group(2, &batch.bind_group, &[]);
 
             pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
@@ -614,14 +616,14 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                             .features()
                             .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
                         {
-                            debug!("Drawing indexed indirect {i:?}: {indirect:#?}");
+                            info!("Drawing indexed indirect {i:?}: {indirect:#?}");
 
                             pass.draw_indexed_indirect(
                                 batch.indirect_buffer.buffer(),
                                 (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
                             );
                         } else {
-                            debug!("Drawing indexed direct {i:?}: {indirect:#?}");
+                            info!("Drawing indexed direct {i:?}: {indirect:#?}");
 
                             let DrawIndexedIndirect {
                                 vertex_count,

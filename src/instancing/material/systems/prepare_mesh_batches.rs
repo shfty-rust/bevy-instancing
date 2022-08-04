@@ -5,14 +5,14 @@ use crate::{
     prelude::{DrawIndexedIndirect, DrawIndirect},
 };
 use bevy::{
-    prelude::{default, info, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut},
+    prelude::{default, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut},
     render::{
         mesh::Indices,
         render_resource::BufferVec,
         renderer::{RenderDevice, RenderQueue},
     },
 };
-use wgpu::{BufferUsages, IndexFormat};
+use wgpu::BufferUsages;
 
 use crate::instancing::material::plugin::{GpuIndirectData, InstancedMeshKey, RenderMeshes};
 

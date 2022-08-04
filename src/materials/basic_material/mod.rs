@@ -29,8 +29,8 @@ impl AsBindGroup for BasicMaterial {
         &self,
         layout: &BindGroupLayout,
         render_device: &RenderDevice,
-        images: &bevy::render::render_asset::RenderAssets<bevy::prelude::Image>,
-        fallback_image: &bevy::render::texture::FallbackImage,
+        _images: &bevy::render::render_asset::RenderAssets<bevy::prelude::Image>,
+        _fallback_image: &bevy::render::texture::FallbackImage,
     ) -> Result<
         bevy::render::render_resource::PreparedBindGroup<Self>,
         bevy::render::render_resource::AsBindGroupError,

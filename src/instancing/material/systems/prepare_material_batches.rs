@@ -5,7 +5,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use bevy::prelude::{debug, info, Res, ResMut};
+use bevy::prelude::{debug, Res, ResMut};
 
 use crate::instancing::material::{
     material_instanced::MaterialInstanced,

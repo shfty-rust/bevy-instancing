@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut, With},
+    prelude::{debug, default, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut, With, info},
     render::{
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
@@ -186,7 +186,7 @@ pub fn system<M: MaterialInstanced>(
             for (key, instances) in keyed_instances.iter() {
                 debug!("{key:#?}");
                 // Collect instance data
-                let mut data = instances
+                let data = instances
                     .iter()
                     .map(|((mesh_handle, _), (_, _, instance))| {
                         let MeshBatch { meshes, .. } = mesh_batches.get(&key.mesh_key).unwrap();
@@ -197,12 +197,6 @@ pub fn system<M: MaterialInstanced>(
                         )
                     })
                     .collect::<Vec<_>>();
-
-                let min_length =
-                    <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH.get() as usize;
-                if instance_buffer_data.len() < min_length {
-                    data.resize(min_length, default());
-                }
 
                 instance_buffer_data
                     .entry(key.clone())
@@ -266,6 +260,7 @@ pub fn system<M: MaterialInstanced>(
         for (key, instance_buffer_data) in instance_buffer_data {
             let entry = view_instance_data.entry(key).or_insert_with(gpu_instances);
 
+            info!("Instance count: {}", instance_buffer_data.len());
             entry.set(instance_buffer_data);
             entry.write_buffer(&render_device, &render_queue);
         }

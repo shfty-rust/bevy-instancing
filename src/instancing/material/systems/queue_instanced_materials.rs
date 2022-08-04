@@ -3,7 +3,7 @@ use std::hash::Hash;
 use bevy::{
     core_pipeline::core_3d::{AlphaMask3d, Opaque3d, Transparent3d},
     pbr::MeshPipelineKey,
-    prelude::{debug, error, info, Commands, Entity, Msaa, Query, Res, ResMut, With},
+    prelude::{debug, error, Commands, Entity, Msaa, Query, Res, ResMut, With},
     render::{
         render_phase::{DrawFunctions, RenderPhase},
         render_resource::{PipelineCache, SpecializedMeshPipelines},
@@ -42,12 +42,11 @@ pub fn system<M: MaterialInstanced>(
     for (view_entity, instance_meta) in query_view.iter() {
         debug!("\tView {view_entity:?}");
 
-        for (key, batched_instances) in &instance_meta.batched_instances {
+        for key in instance_meta.batched_instances.keys() {
             debug!("{key:#?}");
 
             // Spawn entity
-            let material = 
-                material_batches
+            let material = material_batches
                 .get(&key.material_key)
                 .unwrap()
                 .material
@@ -77,10 +76,7 @@ pub fn system<M: MaterialInstanced>(
                 mesh_key |= MeshPipelineKey::TRANSPARENT_MAIN_PASS;
             }
 
-            let material_batch = 
-                material_batches
-                .get(&key.material_key)
-                .unwrap();
+            let material_batch = material_batches.get(&key.material_key).unwrap();
 
             let pipeline = pipelines.specialize(
                 &mut pipeline_cache,

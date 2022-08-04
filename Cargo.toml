@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 bevy = { version = "0.8.0", features = [
-        "dynamic"
+        #"dynamic"
 ]}
 bytemuck = "1.11.0"
 wgpu = "*"

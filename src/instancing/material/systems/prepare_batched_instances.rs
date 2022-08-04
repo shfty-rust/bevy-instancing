@@ -1,7 +1,10 @@
 use std::{collections::BTreeMap, num::NonZeroU64};
 
 use bevy::{
-    prelude::{debug, default, info_span, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, With, ResMut},
+    prelude::{
+        debug, default, info, info_span, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut,
+        With,
+    },
     render::{
         render_resource::{BufferVec, ShaderSize},
         renderer::{RenderDevice, RenderQueue},
@@ -17,7 +20,7 @@ use crate::instancing::{
         material_instanced::MaterialInstanced,
         plugin::{
             BatchedInstances, GpuIndexBufferData, GpuIndirectBufferData, GpuIndirectData,
-            InstanceBatchKey, InstanceMeta, RenderMeshes,
+            GpuInstances, InstanceBatchKey, InstanceMeta, RenderMeshes,
         },
     },
     render::instance::{Instance, InstanceUniformLength},
@@ -28,7 +31,7 @@ use super::{prepare_instance_batches::ViewInstanceData, prepare_mesh_batches::Me
 
 #[derive(Deref, DerefMut)]
 pub struct ViewIndirectData<M: MaterialInstanced> {
-    pub indirect_data: BTreeMap<Entity, BTreeMap<InstanceBatchKey<M>, BufferVec<u8>>>,
+    pub indirect_data: BTreeMap<Entity, BTreeMap<InstanceBatchKey<M>, Vec<BufferVec<u8>>>>,
 }
 
 impl<M: MaterialInstanced> Default for ViewIndirectData<M> {
@@ -161,12 +164,13 @@ pub fn system<M: MaterialInstanced>(
                 )
             });
 
-            // Build indirect buffer
-            let indirect_buffer = view_indirect_data
-                .entry(key.clone())
-                .or_insert_with(|| BufferVec::new(BufferUsages::INDIRECT | BufferUsages::COPY_DST));
+            // Create bind group
+            let instance_buffer_data = view_instance_data.get(&key).unwrap();
 
-            let indirect_buffer_data =
+            // Build indirect buffer
+            let indirect_buffers = view_indirect_data.entry(key.clone()).or_default();
+
+            let mut indirect_buffer_data =
                 info_span!("Create indirect buffer").in_scope(|| match &mesh_batch.indirect_data {
                     GpuIndirectData::Indexed { buffer } => {
                         let indirect_data = buffer
@@ -195,20 +199,82 @@ pub fn system<M: MaterialInstanced>(
                             )
                             .collect::<Vec<_>>();
 
-                        let bytes: Vec<u8> = bytemuck::cast_slice(&indirect_data).to_vec();
+                        info!("Indirect data: {indirect_data:#?}");
 
-                        indirect_buffer.clear();
+                        let mut split_data = vec![];
+                        if matches!(instance_buffer_data, GpuInstances::Uniform { .. }) {
+                            split_data.push(vec![]);
+                            let mut current_split = &mut split_data[0];
 
-                        for byte in bytes {
-                            indirect_buffer.push(byte);
+                            let mut count = 0usize;
+                            let mut offset = 0;
+                            for indirect in &indirect_data {
+                                count += indirect.instance_count as usize;
+                                info!("Count: {count:}");
+                                let total =
+                                    <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH
+                                        .get();
+                                let delta = count as isize - total as isize;
+                                info!("Delta: {delta:}");
+                                if delta > 0 {
+                                    info!("Splitting batch");
+                                    let mut indirect = *indirect;
+                                    let lhs_count = indirect.instance_count - delta as u32;
+                                    indirect.instance_count = lhs_count;
+                                    indirect.base_instance -= offset;
+                                    current_split.push(indirect);
+
+                                    drop(current_split);
+
+                                    split_data.push(vec![]);
+                                    current_split = split_data.last_mut().unwrap();
+
+                                    count = delta as usize;
+
+                                    indirect.instance_count = count as u32;
+                                    offset += indirect.base_instance + lhs_count;
+                                    indirect.base_instance = 0;
+                                    current_split.push(indirect);
+                                } else {
+                                    let mut indirect = *indirect;
+                                    indirect.base_instance -= offset;
+                                    current_split.push(indirect);
+                                }
+                            }
+                        } else {
+                            split_data.push(indirect_data);
                         }
 
-                        indirect_buffer.write_buffer(&render_device, &render_queue);
+                        info!("Split data: {split_data:#?}");
 
-                        GpuIndirectBufferData::Indexed {
-                            indirects: indirect_data,
-                            buffer: indirect_buffer.buffer().unwrap().clone(),
-                        }
+                        split_data
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, data)| {
+                                if indirect_buffers.len() < i + 1 {
+                                    indirect_buffers.push(BufferVec::new(
+                                        BufferUsages::INDIRECT | BufferUsages::COPY_DST,
+                                    ));
+                                }
+
+                                let indirect_buffer = &mut indirect_buffers[i];
+
+                                let bytes: Vec<u8> = bytemuck::cast_slice(&data).to_vec();
+
+                                indirect_buffer.clear();
+
+                                for byte in bytes {
+                                    indirect_buffer.push(byte);
+                                }
+
+                                indirect_buffer.write_buffer(&render_device, &render_queue);
+
+                                GpuIndirectBufferData::Indexed {
+                                    indirects: data,
+                                    buffer: indirect_buffer.buffer().unwrap().clone(),
+                                }
+                            })
+                            .collect::<Vec<_>>()
                     }
                     GpuIndirectData::NonIndexed { buffer } => {
                         let indirect_data = buffer
@@ -233,31 +299,85 @@ pub fn system<M: MaterialInstanced>(
                             )
                             .collect::<Vec<_>>();
 
-                        let bytes: Vec<u8> = bytemuck::cast_slice(&indirect_data).to_vec();
+                        let mut split_data = vec![];
+                        if matches!(instance_buffer_data, GpuInstances::Uniform { .. }) {
+                            split_data.push(vec![]);
+                            let mut current_split = &mut split_data[0];
 
-                        indirect_buffer.clear();
+                            let mut count = 0usize;
+                            for indirect in &indirect_data {
+                                count += indirect.instance_count as usize;
+                                info!("Count: {count:}");
+                                let total =
+                                    <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH
+                                        .get();
+                                let delta = count as isize - total as isize;
+                                info!("Delta: {delta:}");
+                                if delta > 0 {
+                                    info!("Splitting batch");
+                                    let mut indirect = *indirect;
+                                    let lhs_count = indirect.instance_count - delta as u32;
+                                    indirect.instance_count = lhs_count;
+                                    current_split.push(indirect);
 
-                        for byte in bytes {
-                            indirect_buffer.push(byte);
+                                    drop(current_split);
+
+                                    split_data.push(vec![]);
+                                    current_split = split_data.last_mut().unwrap();
+
+                                    indirect.instance_count = delta as u32;
+                                    indirect.base_instance += lhs_count;
+                                    current_split.push(indirect);
+
+                                    count = 0;
+                                } else {
+                                    current_split.push(*indirect);
+                                }
+                            }
+                        } else {
+                            split_data.push(indirect_data);
                         }
 
-                        indirect_buffer.write_buffer(&render_device, &render_queue);
+                        split_data
+                            .into_iter()
+                            .enumerate()
+                            .map(|(i, data)| {
+                                if indirect_buffers.len() < i + 1 {
+                                    indirect_buffers.push(BufferVec::new(
+                                        BufferUsages::INDIRECT | BufferUsages::COPY_DST,
+                                    ));
+                                }
 
-                        GpuIndirectBufferData::NonIndexed {
-                            indirects: indirect_data,
-                            buffer: indirect_buffer.buffer().unwrap().clone(),
-                        }
+                                let indirect_buffer = &mut indirect_buffers[i];
+
+                                let bytes: Vec<u8> = bytemuck::cast_slice(&data).to_vec();
+
+                                indirect_buffer.clear();
+
+                                for byte in bytes {
+                                    indirect_buffer.push(byte);
+                                }
+
+                                indirect_buffer.write_buffer(&render_device, &render_queue);
+
+                                GpuIndirectBufferData::NonIndexed {
+                                    indirects: data,
+                                    buffer: indirect_buffer.buffer().unwrap().clone(),
+                                }
+                            })
+                            .collect::<Vec<_>>()
                     }
                 });
 
             let mut batches = vec![];
 
-            // Create bind group
-            let instance_buffer_data = view_instance_data.get(&key).unwrap();
-
             match instance_buffer_data {
-                crate::instancing::material::plugin::GpuInstances::Uniform { buffers } => {
-                    for (i, buffer) in buffers.into_iter().enumerate() {
+                GpuInstances::Uniform { buffers } => {
+                    info!("Buffers: {}", buffers.len());
+                    for (i, (buffer, indirect)) in
+                        buffers.into_iter().zip(indirect_buffer_data).enumerate()
+                    {
+                        info!("BatchedInstances {i:}");
                         let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
                             label: Some("instance bind group"),
                             layout: &instanced_material_pipeline
@@ -278,12 +398,12 @@ pub fn system<M: MaterialInstanced>(
                         batches.push(BatchedInstances {
                             vertex_buffer: vertex_buffer.clone(),
                             index_buffer: index_buffer.clone(),
-                            indirect_buffer: indirect_buffer_data.clone(),
+                            indirect_buffer: indirect,
                             bind_group,
                         });
                     }
                 }
-                crate::instancing::material::plugin::GpuInstances::Storage { buffer } => {
+                GpuInstances::Storage { buffer } => {
                     let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
                         label: Some("instance bind group"),
                         layout: &instanced_material_pipeline
@@ -298,7 +418,7 @@ pub fn system<M: MaterialInstanced>(
                     batches.push(BatchedInstances {
                         vertex_buffer,
                         index_buffer,
-                        indirect_buffer: indirect_buffer_data,
+                        indirect_buffer: indirect_buffer_data.remove(0),
                         bind_group,
                     });
                 }

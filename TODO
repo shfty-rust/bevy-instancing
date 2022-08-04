@@ -1,19 +1,36 @@
-FIXME: Instances draw incorrect mesh for uniform sub batches after the first one
+FIXME: Flickering at high instance counts
+       * Happens independently of storage / uniform buffers
+       * Appears to occur when a given mesh has more than N instances
+         * Doesn't happen in the test scene if the second set of meshes use duplicate assets
+
+FIXME: Uniform buffer codepath; Indirects with more than MAX_INSTANCE_COUNT * 2 instances are only split once 
+
+FIXME: Non-indexed splitting logic needs to be updated to match indexed equivalent
+       * Ideally should find a way to generalize this
+         * Instance method on GpuInstances?
+
+FIXME: ViewInstanceData / ViewIndirectData is never pruned
+       * Remove view entity entry if it gets removed from the ECS
+       * How to prune instance batch data?
+         * Need a way to check if any instances exist for a given key,
+           then prune if zero
 
 TODO: Specialized binding example for instance compute
       * Double-buffer instances for 3D boids
-
-TODO: Investigate equivalent to babylon.js 'thin instances' functionality
-      * Similar to InstanceSlice; a contiguous block of instances that all draw together with no visibility culling
-      * Primary use case is wasm, needs a low-overhead solution to instancing in the absence of compute
-      * Use a variant of the regular component-based interface
-        * Minus the ComputedVisibility?
 
 TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances
         * Should be able to encode most StandardMaterial params as instance data
       * Secondary goal: Make shadows work
 
+TODO: Investigate equivalent to babylon.js 'thin instances' functionality
+      * Similar to InstanceSlice; a contiguous block of instances that all draw together with no visibility culling
+      * Primary use case is wasm, needs a low-overhead solution to instancing in the absence of compute
+      * Use a variant of the regular component-based interface
+        * Minus the ComputedVisibility?
+      * Ideally data should be updated on change to minimize overhead
+        * This could benefit regular instances too
+        
 FIXME: Instance buffer layout is incorrect under wasm
        * Instances draw, but with incorrect positions
        * Instance buffer appears to be excessively padded
