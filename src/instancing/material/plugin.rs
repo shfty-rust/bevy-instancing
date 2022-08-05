@@ -15,7 +15,7 @@ use bevy::{
     },
     pbr::{AlphaMode, SetMeshViewBindGroup},
     prelude::{
-        debug, default, info, AssetEvent, Assets, Commands, Deref, DerefMut, Entity, EventReader,
+        debug, default, AssetEvent, Assets, Commands, Deref, DerefMut, Entity, EventReader,
         Handle, Image, Local, Mesh, ParallelSystemDescriptorCoercion, Res, ResMut,
     },
     render::{
@@ -587,7 +587,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
         >,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
-        info!("DrawInstanceBatch {item:?}");
+        debug!("DrawInstanceBatch {item:?}");
         let batched_instances = instance_meta
             .get_inner(view)
             .unwrap()
@@ -596,7 +596,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
             .unwrap();
 
         for (i, batch) in batched_instances.into_iter().enumerate() {
-            info!("Batch {}", i);
+            debug!("Batch {}", i);
             pass.set_bind_group(2, &batch.bind_group, &[]);
 
             pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
@@ -616,14 +616,14 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                             .features()
                             .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
                         {
-                            info!("Drawing indexed indirect {i:?}: {indirect:#?}");
+                            debug!("Drawing indexed indirect {i:?}: {indirect:#?}");
 
                             pass.draw_indexed_indirect(
                                 batch.indirect_buffer.buffer(),
                                 (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
                             );
                         } else {
-                            info!("Drawing indexed direct {i:?}: {indirect:#?}");
+                            debug!("Drawing indexed direct {i:?}: {indirect:#?}");
 
                             let DrawIndexedIndirect {
                                 vertex_count,
@@ -660,7 +660,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                                 (i * std::mem::size_of::<DrawIndirect>()) as u64,
                             );
                         } else {
-                            info!("Drawing direct {i:?}: {indirect:#?}");
+                            debug!("Drawing direct {i:?}: {indirect:#?}");
 
                             let DrawIndirect {
                                 vertex_count,

@@ -1,7 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
-    prelude::{debug, default, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut, With, info},
+    prelude::{
+        debug, default, info, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut, With,
+    },
     render::{
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
@@ -19,7 +21,7 @@ use crate::instancing::{
         },
         systems::prepare_mesh_batches::MeshBatch,
     },
-    render::instance::{Instance, InstanceUniformLength},
+    render::instance::Instance,
 };
 
 use super::prepare_mesh_batches::MeshBatches;
@@ -68,14 +70,14 @@ pub fn system<M: MaterialInstanced>(
             // Batch instances by key
             let mut keyed_instances = BTreeMap::<
                 InstanceBatchKey<M>,
-                BTreeMap<
+                Vec<(
                     (&Handle<Mesh>, FloatOrd),
                     (
                         Entity,
                         &Handle<M>,
                         &<M::Instance as Instance>::ExtractedInstance,
                     ),
-                >,
+                )>,
             >::new();
 
             for (entity, material_handle, mesh_handle, instance) in instance_meta
@@ -83,11 +85,15 @@ pub fn system<M: MaterialInstanced>(
                 .iter()
                 .flat_map(|entity| query_instance.get(*entity))
             {
+                debug!("Instance {entity:?}");
+
                 let mesh = if let Some(mesh) = render_meshes.get(mesh_handle) {
                     mesh
                 } else {
                     continue;
                 };
+
+                debug!("Mesh valid");
 
                 let mesh_key = mesh.key.clone();
 
@@ -96,6 +102,8 @@ pub fn system<M: MaterialInstanced>(
                 } else {
                     continue;
                 };
+
+                debug!("Material valid");
 
                 let alpha_mode = GpuAlphaMode::from(material.properties.alpha_mode);
                 let material_key = InstancedMaterialBatchKey {
@@ -120,14 +128,20 @@ pub fn system<M: MaterialInstanced>(
                     material_key,
                 };
 
-                keyed_instances.entry(key).or_default().insert(
+                keyed_instances.entry(key).or_default().push((
                     (mesh_handle, FloatOrd(dist)),
                     (entity, material_handle, instance),
-                );
+                ));
             }
 
             keyed_instances
         });
+
+        for instances in keyed_instances.values_mut() {
+            instances.sort_unstable_by(|(lhs_key, _), (rhs_key, _)| lhs_key.cmp(rhs_key))
+        }
+
+        debug!("Keyed instances: {:#?}", keyed_instances.values());
 
         let span = bevy::prelude::info_span!("Batch instance slices by key");
         let keyed_instance_slices = span.in_scope(|| {
@@ -258,9 +272,13 @@ pub fn system<M: MaterialInstanced>(
 
         let view_instance_data = view_instance_data.entry(view_entity).or_default();
         for (key, instance_buffer_data) in instance_buffer_data {
+            debug!(
+                "Instance batch {key:#?} count: {}",
+                instance_buffer_data.len()
+            );
+
             let entry = view_instance_data.entry(key).or_insert_with(gpu_instances);
 
-            info!("Instance count: {}", instance_buffer_data.len());
             entry.set(instance_buffer_data);
             entry.write_buffer(&render_device, &render_queue);
         }

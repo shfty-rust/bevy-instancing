@@ -199,7 +199,7 @@ pub fn system<M: MaterialInstanced>(
                             )
                             .collect::<Vec<_>>();
 
-                        info!("Indirect data: {indirect_data:#?}");
+                        debug!("Indirect data: {indirect_data:#?}");
 
                         let mut split_data = vec![];
                         if matches!(instance_buffer_data, GpuInstances::Uniform { .. }) {
@@ -210,14 +210,14 @@ pub fn system<M: MaterialInstanced>(
                             let mut offset = 0;
                             for indirect in &indirect_data {
                                 count += indirect.instance_count as usize;
-                                info!("Count: {count:}");
+                                debug!("Count: {count:}");
                                 let total =
                                     <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH
                                         .get();
                                 let delta = count as isize - total as isize;
-                                info!("Delta: {delta:}");
+                                debug!("Delta: {delta:}");
                                 if delta > 0 {
-                                    info!("Splitting batch");
+                                    debug!("Splitting batch");
                                     let mut indirect = *indirect;
                                     let lhs_count = indirect.instance_count - delta as u32;
                                     indirect.instance_count = lhs_count;
@@ -245,7 +245,7 @@ pub fn system<M: MaterialInstanced>(
                             split_data.push(indirect_data);
                         }
 
-                        info!("Split data: {split_data:#?}");
+                        debug!("Split data: {split_data:#?}");
 
                         split_data
                             .into_iter()

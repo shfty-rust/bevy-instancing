@@ -5,7 +5,7 @@ use crate::{
     prelude::{DrawIndexedIndirect, DrawIndirect},
 };
 use bevy::{
-    prelude::{default, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut},
+    prelude::{debug, default, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut},
     render::{
         mesh::Indices,
         render_resource::BufferVec,
@@ -29,18 +29,6 @@ impl BufferIndices {
         }
     }
 }
-
-/*
-pub enum GpuIndexBufferData {
-    Indexed {
-        indices: Indices,
-        index_format: IndexFormat,
-    },
-    NonIndexed {
-        vertex_count: u32,
-    },
-}
-*/
 
 pub struct MeshBatch {
     pub meshes: BTreeSet<Handle<Mesh>>,
@@ -197,6 +185,8 @@ pub fn system(
                                 .collect::<Vec<_>>(),
                         },
                     });
+
+                debug!("Mesh batch {key:#?}: {meshes:#?}");
 
                 (
                     key.clone(),

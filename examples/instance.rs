@@ -6,7 +6,7 @@ use bevy::{
         default,
         shape::{Cube, Icosphere, Quad, Torus, UVSphere},
         App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, EventWriter, Handle,
-        Mesh, PerspectiveProjection, Res, ResMut, SpatialBundle, Transform,
+        Mesh, PerspectiveProjection, Res, ResMut, SpatialBundle, Transform, info,
     },
     render::{
         camera::{Projection, RenderTarget},
@@ -57,61 +57,6 @@ fn setup_instancing(
     mut texture_materials: ResMut<Assets<TextureMaterial>>,
     mut commands: Commands,
 ) {
-    // Directional Light
-    commands.spawn().insert_bundle(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            illuminance: 4000.,
-            ..default()
-        },
-        transform: Transform {
-            // Workaround: Pointing straight up or down prevents directional shadow from rendering
-            rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2 * 0.6),
-            ..default()
-        },
-        ..default()
-    });
-
-    // main camera
-    commands.spawn_bundle(Camera3dBundle {
-        transform: Transform::from_xyz(-50.0, 50.0, 50.0)
-            .looking_at(Vec3::new(0.0, 0.0, 0.0), Vec3::Y),
-        projection: Projection::Perspective(PerspectiveProjection {
-            fov: 15.0f32.to_radians(),
-            ..default()
-        }),
-        ..default()
-    });
-
-    if USE_SECOND_CAMERA {
-        let window_id = WindowId::new();
-
-        // sends out a "CreateWindow" event, which will be received by the windowing backend
-        create_window_events.send(CreateWindow {
-            id: window_id,
-            descriptor: WindowDescriptor {
-                width: 800.,
-                height: 600.,
-                present_mode: PresentMode::AutoNoVsync,
-                title: "Second window".to_string(),
-                ..default()
-            },
-        });
-
-        // second window camera
-        commands.spawn_bundle(Camera3dBundle {
-            transform: Transform::from_xyz(50.0, 0.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
-            camera: Camera {
-                target: RenderTarget::Window(window_id),
-                ..default()
-            },
-            projection: Projection::Perspective(PerspectiveProjection {
-                fov: 15.0f32.to_radians(),
-                ..default()
-            }),
-            ..default()
-        });
-    }
-
     // Populate scene
     let mesh_cube = meshes.add(Cube::default().into());
     let mesh_quad = meshes.add(Quad::default().into());
@@ -142,19 +87,21 @@ fn setup_instancing(
     );
 
     let meshes = [
-        mesh_cube.clone(),
         mesh_quad.clone(),
-        mesh_icosphere.clone(),
+        mesh_cube.clone(),
         mesh_uv_sphere.clone(),
+        mesh_icosphere.clone(),
         mesh_torus.clone(),
-        mesh_cube,
         mesh_quad,
-        mesh_icosphere,
+        mesh_cube,
         mesh_uv_sphere,
+        mesh_icosphere,
         mesh_torus,
     ];
 
     let material_basic = Handle::<BasicMaterial>::default();
+
+    let basic_materials: &[Handle<BasicMaterial>] = &[material_basic];
 
     let material_opaque_no_cull = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Opaque,
@@ -237,7 +184,7 @@ fn setup_instancing(
         cull_mode: Some(Face::Back),
     });
 
-    let texture_materials = &[
+    let texture_materials: &[Handle<TextureMaterial>] = &[
         material_texture_1,
         material_texture_2,
         material_texture_3,
@@ -246,30 +193,42 @@ fn setup_instancing(
 
     let colors = std::iter::once(Color::rgba(1.0, 1.0, 1.0, 0.5))
         .chain(
-            (0..24)
+            (0..12)
                 .into_iter()
-                .map(|i| i as f32 / 16.0)
+                .map(|i| (i as f32 / 16.0) % 1.0)
                 .map(|i| Color::hsla(i * 360.0, 1.0, 0.5, 0.5)),
         )
         .collect::<Vec<_>>();
 
-    for (x, mesh) in meshes.into_iter().enumerate() {
-        commands
-            .spawn()
-            .insert(Name::new("Basic Instance"))
-            .insert_bundle(MeshInstanceBundle::<BasicMaterial> {
-                mesh: mesh.clone(),
-                material: material_basic.clone(),
-                spatial_bundle: SpatialBundle {
-                    transform: Transform::from_xyz(x as f32 * 1.5, 0.0, 0.0).into(),
-                    ..default()
-                },
-                ..default()
-            });
-        //.insert(NoFrustumCulling);
+    let mesh_count = meshes.len();
+    let material_count = basic_materials.len() + custom_materials.len() + texture_materials.len();
+    let color_count = colors.len();
 
+    for (x, mesh) in meshes.into_iter().enumerate() {
         for (z, color) in colors.iter().copied().enumerate() {
             let mut y = 0;
+
+            for material in basic_materials.iter() {
+                commands
+                    .spawn()
+                    .insert(Name::new("Basic Instance"))
+                    .insert_bundle(MeshInstanceBundle::<BasicMaterial> {
+                        mesh: mesh.clone(),
+                        material: material.clone(),
+                        spatial_bundle: SpatialBundle {
+                            transform: Transform::from_xyz(
+                                x as f32 * 1.5,
+                                y as f32 * 1.5,
+                                z as f32 * -1.5,
+                            )
+                            .into(),
+                            ..default()
+                        },
+                        ..default()
+                    });
+                //.insert(NoFrustumCulling);
+            }
+
             for material in custom_materials.iter() {
                 commands
                     .spawn()
@@ -322,5 +281,67 @@ fn setup_instancing(
                 y += 1;
             }
         }
+    }
+
+    // Directional Light
+    commands.spawn().insert_bundle(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            illuminance: 4000.,
+            ..default()
+        },
+        transform: Transform {
+            // Workaround: Pointing straight up or down prevents directional shadow from rendering
+            rotation: Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2 * 0.6),
+            ..default()
+        },
+        ..default()
+    });
+
+    // main camera
+    let look_target = Vec3::new(
+        mesh_count as f32 / 2.0,
+        material_count as f32 / 2.0,
+        -(color_count as f32 / 2.0),
+    );
+
+    info!("Look target: {look_target:?}");
+
+    commands.spawn_bundle(Camera3dBundle {
+        transform: Transform::from_xyz(50.0, 50.0, 50.0).looking_at(look_target, Vec3::Y),
+        projection: Projection::Perspective(PerspectiveProjection {
+            fov: 25.0f32.to_radians(),
+            ..default()
+        }),
+        ..default()
+    });
+
+    if USE_SECOND_CAMERA {
+        let window_id = WindowId::new();
+
+        // sends out a "CreateWindow" event, which will be received by the windowing backend
+        create_window_events.send(CreateWindow {
+            id: window_id,
+            descriptor: WindowDescriptor {
+                width: 800.,
+                height: 600.,
+                present_mode: PresentMode::AutoNoVsync,
+                title: "Second window".to_string(),
+                ..default()
+            },
+        });
+
+        // second window camera
+        commands.spawn_bundle(Camera3dBundle {
+            transform: Transform::from_xyz(50.0, 0.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
+            camera: Camera {
+                target: RenderTarget::Window(window_id),
+                ..default()
+            },
+            projection: Projection::Perspective(PerspectiveProjection {
+                fov: 15.0f32.to_radians(),
+                ..default()
+            }),
+            ..default()
+        });
     }
 }

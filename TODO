@@ -1,7 +1,5 @@
-FIXME: Flickering at high instance counts
-       * Happens independently of storage / uniform buffers
-       * Appears to occur when a given mesh has more than N instances
-         * Doesn't happen in the test scene if the second set of meshes use duplicate assets
+FIXME: Instances added out of batch order fail to batch together
+       * Instance example scene will only draw one 'set' of cubes if added using cloned handles
 
 FIXME: Uniform buffer codepath; Indirects with more than MAX_INSTANCE_COUNT * 2 instances are only split once 
 
