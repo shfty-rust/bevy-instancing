@@ -1,6 +1,3 @@
-FIXME: Instances added out of batch order fail to batch together
-       * Instance example scene will only draw one 'set' of cubes if added using cloned handles
-
 FIXME: Uniform buffer codepath; Indirects with more than MAX_INSTANCE_COUNT * 2 instances are only split once 
 
 FIXME: Non-indexed splitting logic needs to be updated to match indexed equivalent
