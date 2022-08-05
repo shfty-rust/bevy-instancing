@@ -203,41 +203,52 @@ pub fn system<M: MaterialInstanced>(
 
                         let mut split_data = vec![];
                         if matches!(instance_buffer_data, GpuInstances::Uniform { .. }) {
+                            debug!("Using uniform instance buffer");
                             split_data.push(vec![]);
                             let mut current_split = &mut split_data[0];
 
-                            let mut count = 0usize;
-                            let mut offset = 0;
+                            let total =
+                                <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH.get();
+
+                            let mut offset = 0isize;
                             for indirect in &indirect_data {
-                                count += indirect.instance_count as usize;
-                                debug!("Count: {count:}");
-                                let total =
-                                    <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH
-                                        .get();
-                                let delta = count as isize - total as isize;
-                                debug!("Delta: {delta:}");
-                                if delta > 0 {
-                                    debug!("Splitting batch");
-                                    let mut indirect = *indirect;
-                                    let lhs_count = indirect.instance_count - delta as u32;
-                                    indirect.instance_count = lhs_count;
-                                    indirect.base_instance -= offset;
-                                    current_split.push(indirect);
+                                debug!("Offset: {offset:?}");
+                                debug!("Indirect {indirect:#?}");
+
+                                let mut indirect = *indirect;
+
+                                loop {
+                                    let overflow = offset as isize + indirect.instance_count as isize - total as isize;
+
+                                    debug!("\tOverflow: {overflow:}");
+
+                                    if overflow <= 0 {
+                                        break;
+                                    }
+
+                                    debug!("\tSplitting batch");
+                                    let mut split_indirect = indirect;
+                                    split_indirect.instance_count = total as u32 - offset as u32;
+                                    split_indirect.base_instance = offset as u32;
+
+                                    debug!("\tSplit indirect:\n{split_indirect:#?}");
+
+                                    current_split.push(split_indirect);
 
                                     drop(current_split);
 
                                     split_data.push(vec![]);
                                     current_split = split_data.last_mut().unwrap();
 
-                                    count = delta as usize;
+                                    indirect.instance_count -= total as u32 - offset as u32;
 
-                                    indirect.instance_count = count as u32;
-                                    offset += indirect.base_instance + lhs_count;
-                                    indirect.base_instance = 0;
-                                    current_split.push(indirect);
-                                } else {
-                                    let mut indirect = *indirect;
-                                    indirect.base_instance -= offset;
+                                    offset = 0;
+                                }
+
+                                if indirect.instance_count > 0 {
+                                    indirect.base_instance = offset as u32;
+                                    offset = indirect.instance_count as isize;
+                                    debug!("Remainder indirect:\n{indirect:#?}");
                                     current_split.push(indirect);
                                 }
                             }
@@ -307,12 +318,12 @@ pub fn system<M: MaterialInstanced>(
                             let mut count = 0usize;
                             for indirect in &indirect_data {
                                 count += indirect.instance_count as usize;
-                                info!("Count: {count:}");
+                                debug!("Count: {count:}");
                                 let total =
                                     <M::Instance as InstanceUniformLength>::UNIFORM_BUFFER_LENGTH
                                         .get();
                                 let delta = count as isize - total as isize;
-                                info!("Delta: {delta:}");
+                                debug!("Delta: {delta:}");
                                 if delta > 0 {
                                     info!("Splitting batch");
                                     let mut indirect = *indirect;

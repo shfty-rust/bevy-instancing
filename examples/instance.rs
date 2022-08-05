@@ -3,10 +3,10 @@ use bevy::{
     math::{Quat, Vec3},
     pbr::{AlphaMode, DirectionalLight, DirectionalLightBundle},
     prelude::{
-        default,
+        default, info,
         shape::{Cube, Icosphere, Quad, Torus, UVSphere},
         App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, EventWriter, Handle,
-        Mesh, PerspectiveProjection, Res, ResMut, SpatialBundle, Transform, info,
+        Mesh, PerspectiveProjection, Res, ResMut, SpatialBundle, Transform,
     },
     render::{
         camera::{Projection, RenderTarget},
@@ -101,7 +101,7 @@ fn setup_instancing(
 
     let material_basic = Handle::<BasicMaterial>::default();
 
-    let basic_materials: &[Handle<BasicMaterial>] = &[material_basic];
+    let basic_materials: &[Handle<BasicMaterial>] = &[/*material_basic*/];
 
     let material_opaque_no_cull = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Opaque,
@@ -193,11 +193,12 @@ fn setup_instancing(
 
     let colors = std::iter::once(Color::rgba(1.0, 1.0, 1.0, 0.5))
         .chain(
-            (0..12)
+            (0..24)
                 .into_iter()
                 .map(|i| (i as f32 / 16.0) % 1.0)
                 .map(|i| Color::hsla(i * 360.0, 1.0, 0.5, 0.5)),
         )
+        .chain(std::iter::once(Color::rgba(0.0, 0.0, 0.0, 0.5)))
         .collect::<Vec<_>>();
 
     let mesh_count = meshes.len();
@@ -299,17 +300,20 @@ fn setup_instancing(
 
     // main camera
     let look_target = Vec3::new(
-        mesh_count as f32 / 2.0,
-        material_count as f32 / 2.0,
-        -(color_count as f32 / 2.0),
+        (mesh_count as f32 * 1.5) / 2.0,
+        (material_count as f32 * 1.5) / 2.0,
+        -((color_count as f32 * 1.5) / 2.0),
     );
 
-    info!("Look target: {look_target:?}");
+    info!(
+        "Instance count: {}",
+        mesh_count * material_count * color_count
+    );
 
     commands.spawn_bundle(Camera3dBundle {
         transform: Transform::from_xyz(50.0, 50.0, 50.0).looking_at(look_target, Vec3::Y),
         projection: Projection::Perspective(PerspectiveProjection {
-            fov: 25.0f32.to_radians(),
+            fov: 45.0f32.to_radians(),
             ..default()
         }),
         ..default()
