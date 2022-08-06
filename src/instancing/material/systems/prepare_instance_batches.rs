@@ -137,10 +137,6 @@ pub fn system<M: MaterialInstanced>(
             keyed_instances
         });
 
-        if keyed_instances.is_empty() {
-            continue;
-        }
-
         for instances in keyed_instances.values_mut() {
             instances.sort_unstable_by(|(lhs_key, _), (rhs_key, _)| lhs_key.cmp(rhs_key))
         }
@@ -198,6 +194,10 @@ pub fn system<M: MaterialInstanced>(
             "Keyed instance slices: {:#?}",
             keyed_instance_slices.values()
         );
+
+        if keyed_instances.is_empty() && keyed_instance_slices.is_empty() {
+            continue;
+        }
 
         // Create instance buffer data
         let gpu_instances =
