@@ -5,13 +5,16 @@ use bevy::{
     prelude::{
         default, info,
         shape::{Cube, Icosphere, Quad, Torus, UVSphere},
-        App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, EventWriter, Handle,
-        Mesh, PerspectiveProjection, Res, ResMut, SpatialBundle, Transform,
+        App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, Entity, EventWriter,
+        Handle, Local, Mesh, PerspectiveProjection, Query, Res, ResMut, SpatialBundle, Transform,
+        With,
     },
     render::{
         camera::{Projection, RenderTarget},
         render_resource::Face,
+        view::VisibleEntities,
     },
+    time::Time,
     window::{CreateWindow, PresentMode, WindowDescriptor, WindowId},
     DefaultPlugins,
 };
@@ -101,7 +104,7 @@ fn setup_instancing(
 
     let material_basic = Handle::<BasicMaterial>::default();
 
-    let basic_materials: &[Handle<BasicMaterial>] = &[/*material_basic*/];
+    let basic_materials: &[Handle<BasicMaterial>] = &[material_basic];
 
     let material_opaque_no_cull = board_materials.add(CustomMaterial {
         alpha_mode: AlphaMode::Opaque,
@@ -349,3 +352,4 @@ fn setup_instancing(
         });
     }
 }
+

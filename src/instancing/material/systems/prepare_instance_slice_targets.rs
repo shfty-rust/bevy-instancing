@@ -20,7 +20,12 @@ pub fn system<M: MaterialInstanced>(
 ) {
     for (view_entity, instance_meta) in query_views.iter() {
         debug!("\tView {view_entity:?}");
-        let view_instance_data = view_instance_data.get(&view_entity).unwrap();
+        let view_instance_data =
+            if let Some(view_instance_data) = view_instance_data.get(&view_entity) {
+                view_instance_data
+            } else {
+                continue;
+            };
 
         for key in instance_meta.instance_batches.keys() {
             let instance_buffer_data = view_instance_data.get(key).unwrap();

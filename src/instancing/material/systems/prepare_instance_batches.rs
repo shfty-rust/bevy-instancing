@@ -137,6 +137,10 @@ pub fn system<M: MaterialInstanced>(
             keyed_instances
         });
 
+        if keyed_instances.is_empty() {
+            continue;
+        }
+
         for instances in keyed_instances.values_mut() {
             instances.sort_unstable_by(|(lhs_key, _), (rhs_key, _)| lhs_key.cmp(rhs_key))
         }
@@ -155,10 +159,20 @@ pub fn system<M: MaterialInstanced>(
                 .flat_map(|entity| query_instance_slice.get(*entity))
             {
                 debug!("Instance slice {entity:?}");
-                let mesh = render_meshes.get(mesh_handle).unwrap();
+                let mesh = if let Some(mesh) = render_meshes.get(mesh_handle) {
+                    mesh
+                } else {
+                    continue;
+                };
+
                 let mesh_key = mesh.key.clone();
 
-                let material = render_materials.get(material_handle).unwrap();
+                let material = if let Some(material) = render_materials.get(material_handle) {
+                    material
+                } else {
+                    continue;
+                };
+
                 let alpha_mode = GpuAlphaMode::from(material.properties.alpha_mode);
                 let material_key = InstancedMaterialBatchKey {
                     alpha_mode,
@@ -312,5 +326,24 @@ pub fn system<M: MaterialInstanced>(
                     )
                 }));
         });
+    }
+}
+
+pub fn prune_instance_data<M: MaterialInstanced>(
+    mut view_instance_data: ResMut<ViewInstanceData<M>>,
+    query_instance_meta: Query<
+        (Entity, &mut InstanceMeta<M>),
+        (With<ExtractedView>, With<VisibleEntities>),
+    >,
+) {
+    // Prune indirect data for views with no batches
+    for entity in view_instance_data.keys().cloned().collect::<Vec<_>>() {
+        if !query_instance_meta
+            .iter()
+            .any(|(view_entity, _)| view_entity == entity)
+        {
+            info!("View {entity:?} has no instance meta, pruning instance data");
+            view_instance_data.remove(&entity);
+        }
     }
 }

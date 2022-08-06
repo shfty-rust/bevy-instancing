@@ -1,22 +1,19 @@
-FIXME: Uniform buffer codepath; Indirects with more than MAX_INSTANCE_COUNT * 2 instances are only split once 
-
-FIXME: Non-indexed splitting logic needs to be updated to match indexed equivalent
-       * Ideally should find a way to generalize this
-         * Instance method on GpuInstances?
-
-FIXME: ViewInstanceData / ViewIndirectData is never pruned
-       * Remove view entity entry if it gets removed from the ECS
-       * How to prune instance batch data?
-         * Need a way to check if any instances exist for a given key,
-           then prune if zero
-
 TODO: Specialized binding example for instance compute
       * Double-buffer instances for 3D boids
+      * Geometry line rendering?
 
 TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances
         * Should be able to encode most StandardMaterial params as instance data
       * Secondary goal: Make shadows work
+
+FIXME: Instance buffer layout is incorrect under wasm
+       * Instances draw, but with incorrect positions
+       * Instance buffer appears to be excessively padded
+         * Manually drawing instances 0..64 for each indirect reveals that all the transform data is there,
+           but at unexpectedly wide intervals instead of the expected 1-instance-wide
+         * Experimented with explicitly specifying struct size and alignment, but makes no difference
+         * Likely some unaccounted-for wgpu limit
 
 TODO: Investigate equivalent to babylon.js 'thin instances' functionality
       * Similar to InstanceSlice; a contiguous block of instances that all draw together with no visibility culling
@@ -25,14 +22,6 @@ TODO: Investigate equivalent to babylon.js 'thin instances' functionality
         * Minus the ComputedVisibility?
       * Ideally data should be updated on change to minimize overhead
         * This could benefit regular instances too
-        
-FIXME: Instance buffer layout is incorrect under wasm
-       * Instances draw, but with incorrect positions
-       * Instance buffer appears to be excessively padded
-         * Manually drawing instances 0..64 for each indirect reveals that all the transform data is there,
-           but at unexpectedly wide intervals instead of the expected 1-instance-wide
-         * Experimented with explicitly specifying struct size and alignment, but makes no difference
-         * Likely some unaccounted-for wgpu limit
 
 NOTES: Transparency ordering
       * Currently, transparency ordering is only correct versus other instances with the

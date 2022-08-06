@@ -1,5 +1,8 @@
 use crate::{
-    instancing::{mesh_instance::MeshInstance, render::instance::InstanceUniformLength},
+    instancing::{
+        indirect::IndirectDraw, mesh_instance::MeshInstance,
+        render::instance::InstanceUniformLength,
+    },
     prelude::{DrawIndexedIndirect, DrawIndirect},
 };
 use bevy::{
@@ -15,8 +18,8 @@ use bevy::{
     },
     pbr::{AlphaMode, SetMeshViewBindGroup},
     prelude::{
-        debug, default, AssetEvent, Assets, Commands, Deref, DerefMut, Entity, EventReader,
-        Handle, Image, Local, Mesh, ParallelSystemDescriptorCoercion, Res, ResMut,
+        debug, default, AssetEvent, Assets, Commands, Deref, DerefMut, Entity, EventReader, Handle,
+        Image, Local, Mesh, ParallelSystemDescriptorCoercion, Res, ResMut,
     },
     render::{
         extract_component::ExtractComponentPlugin,
@@ -97,7 +100,6 @@ where
                 .init_resource::<RenderMeshes>()
                 .init_resource::<RenderMaterials<M>>()
                 .init_resource::<MaterialBatches<M>>()
-                .init_resource::<MaterialBatches<M>>()
                 .init_resource::<ViewInstanceData<M>>()
                 .init_resource::<ViewIndirectData<M>>()
                 .init_resource::<SpecializedMeshPipelines<InstancedMaterialPipeline<M>>>()
@@ -132,6 +134,16 @@ where
                     RenderStage::Prepare,
                     prepare_batched_instances::system::<M>
                         .after(prepare_instance_batches::system::<M>),
+                )
+                .add_system_to_stage(
+                    RenderStage::Prepare,
+                    prepare_instance_batches::prune_instance_data::<M>
+                        .after(prepare_batched_instances::system::<M>),
+                )
+                .add_system_to_stage(
+                    RenderStage::Prepare,
+                    prepare_batched_instances::prune_indirect_data::<M>
+                        .after(prepare_batched_instances::system::<M>),
                 )
                 .add_system_to_stage(
                     RenderStage::Prepare,
@@ -217,6 +229,23 @@ pub enum GpuIndirectData {
 }
 
 impl GpuIndirectData {
+    pub fn iter(&self) -> impl Iterator<Item = IndirectDraw> {
+        match self {
+            GpuIndirectData::NonIndexed { buffer } => buffer
+                .iter()
+                .copied()
+                .map(IndirectDraw::NonIndexed)
+                .collect::<Vec<_>>()
+                .into_iter(),
+            GpuIndirectData::Indexed { buffer } => buffer
+                .iter()
+                .copied()
+                .map(IndirectDraw::Indexed)
+                .collect::<Vec<_>>()
+                .into_iter(),
+        }
+    }
+
     pub fn len(&self) -> usize {
         match self {
             GpuIndirectData::NonIndexed { buffer } => buffer.len(),
@@ -517,38 +546,9 @@ impl<M: MaterialInstanced> Default for InstanceMeta<M> {
 }
 
 #[derive(Debug, Clone)]
-pub enum GpuIndirectBufferData {
-    Indexed {
-        indirects: Vec<DrawIndexedIndirect>,
-        buffer: Buffer,
-    },
-    NonIndexed {
-        indirects: Vec<DrawIndirect>,
-        buffer: Buffer,
-    },
-}
-
-impl GpuIndirectBufferData {
-    pub fn buffer(&self) -> &Buffer {
-        match self {
-            GpuIndirectBufferData::Indexed { buffer, .. } => buffer,
-            GpuIndirectBufferData::NonIndexed { buffer, .. } => buffer,
-        }
-    }
-
-    pub fn indirects(&self) -> Option<&Vec<DrawIndirect>> {
-        match self {
-            GpuIndirectBufferData::NonIndexed { indirects, .. } => Some(indirects),
-            _ => None,
-        }
-    }
-
-    pub fn indexed_indirects(&self) -> Option<&Vec<DrawIndexedIndirect>> {
-        match self {
-            GpuIndirectBufferData::Indexed { indirects, .. } => Some(indirects),
-            _ => None,
-        }
-    }
+pub struct GpuIndirectBufferData {
+    pub indirects: Vec<IndirectDraw>,
+    pub buffer: Buffer,
 }
 
 /// The data necessary to render one set of mutually compatible instances
@@ -601,29 +601,35 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
 
             pass.set_vertex_buffer(0, batch.vertex_buffer.slice(..));
 
-            match &batch.index_buffer {
-                Some((index_buffer, index_format)) => {
-                    pass.set_index_buffer(index_buffer.slice(..), 0, *index_format);
+            if let Some((index_buffer, index_format)) = &batch.index_buffer {
+                pass.set_index_buffer(index_buffer.slice(..), 0, *index_format);
+            }
 
-                    for (i, indirect) in batch
-                        .indirect_buffer
-                        .indexed_indirects()
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
-                        if render_device
-                            .features()
-                            .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
-                        {
+            for (i, indirect) in batch.indirect_buffer.indirects.iter().enumerate() {
+                if render_device
+                    .features()
+                    .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                {
+                    match indirect {
+                        IndirectDraw::Indexed(_) => {
                             debug!("Drawing indexed indirect {i:?}: {indirect:#?}");
-
                             pass.draw_indexed_indirect(
-                                batch.indirect_buffer.buffer(),
+                                &batch.indirect_buffer.buffer,
                                 (i * std::mem::size_of::<DrawIndexedIndirect>()) as u64,
                             );
-                        } else {
-                            debug!("Drawing indexed direct {i:?}: {indirect:#?}");
+                        }
+                        IndirectDraw::NonIndexed(_) => {
+                            debug!("Drawing indirect {i:?}: {indirect:#?}");
+                            pass.draw_indirect(
+                                &batch.indirect_buffer.buffer,
+                                (i * std::mem::size_of::<DrawIndirect>()) as u64,
+                            );
+                        }
+                    }
+                } else {
+                    match indirect {
+                        IndirectDraw::Indexed(draw) => {
+                            debug!("Drawing indexed direct {i:?}: {draw:#?}");
 
                             let DrawIndexedIndirect {
                                 vertex_count,
@@ -631,7 +637,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                                 base_index,
                                 vertex_offset,
                                 base_instance,
-                            } = *indirect;
+                            } = *draw;
 
                             pass.draw_indexed(
                                 base_index..base_index + vertex_count,
@@ -639,35 +645,14 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
                                 base_instance..base_instance + instance_count,
                             );
                         }
-                    }
-                }
-                None => {
-                    for (i, indirect) in batch
-                        .indirect_buffer
-                        .indirects()
-                        .unwrap()
-                        .iter()
-                        .enumerate()
-                    {
-                        if render_device
-                            .features()
-                            .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
-                        {
-                            debug!("Drawing indirect {i:?}: {indirect:#?}");
-
-                            pass.draw_indirect(
-                                batch.indirect_buffer.buffer(),
-                                (i * std::mem::size_of::<DrawIndirect>()) as u64,
-                            );
-                        } else {
+                        IndirectDraw::NonIndexed(draw) => {
                             debug!("Drawing direct {i:?}: {indirect:#?}");
-
                             let DrawIndirect {
                                 vertex_count,
                                 instance_count,
                                 base_vertex,
                                 base_instance,
-                            } = *indirect;
+                            } = *draw;
 
                             pass.draw(
                                 base_vertex..base_vertex + vertex_count,
