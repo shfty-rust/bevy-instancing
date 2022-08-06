@@ -1,6 +1,7 @@
 TODO: Specialized binding example for instance compute
       * Double-buffer instances for 3D boids
-      * Geometry line rendering?
+        * Need to refactor InstanceCompute to allow bind group creation
+          * Look over bevy specializers and see what's most appropriate
 
 TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances
