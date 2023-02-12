@@ -12,7 +12,8 @@ use bevy::{
         renderer::{RenderDevice, RenderQueue},
     },
 };
-use wgpu::BufferUsages;
+// use wgpu::BufferUsages;
+use bevy::render::render_resource::BufferUsages;
 
 use crate::instancing::material::plugin::{GpuIndirectData, InstancedMeshKey, RenderMeshes};
 

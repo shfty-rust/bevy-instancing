@@ -608,7 +608,7 @@ impl<M: MaterialInstanced> EntityRenderCommand for DrawBatchedInstances<M> {
             for (i, indirect) in batch.indirect_buffer.indirects.iter().enumerate() {
                 if render_device
                     .features()
-                    .contains(wgpu::Features::INDIRECT_FIRST_INSTANCE)
+                    .contains(bevy::render::render_resource::WgpuFeatures::INDIRECT_FIRST_INSTANCE)
                 {
                     match indirect {
                         IndirectDraw::Indexed(_) => {
