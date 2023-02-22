@@ -12,7 +12,8 @@ use bevy::{
         Extract,
     },
 };
-use wgpu::{BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages};
+// use wgpu::{BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages};
+use bevy::render::render_resource::{BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages};
 
 use crate::instancing::{
     indirect::{DrawCall, DrawOffsets, IndirectDraw},
@@ -325,7 +326,7 @@ pub fn system<M: MaterialInstanced>(
                                 .bind_group_layout,
                             entries: &[BindGroupEntry {
                                 binding: 0,
-                                resource: wgpu::BindingResource::Buffer(BufferBinding {
+                                resource: bevy::render::render_resource::BindingResource::Buffer(BufferBinding {
                                     buffer: buffer.buffer().unwrap(),
                                     offset: 0,
                                     size: Some(
