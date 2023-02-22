@@ -14,11 +14,7 @@ use bevy::{
     core::Name,
     math::{Quat, Vec3},
     pbr::{AlphaMode, DirectionalLight, DirectionalLightBundle},
-    prelude::{
-        default,
-        shape::{Cube, Icosphere},
-        App, Assets, Commands, Mesh, ResMut, Transform,
-    },
+    prelude::{default, shape::Cube, App, Assets, Commands, Mesh, ResMut, Transform},
     DefaultPlugins,
 };
 
@@ -87,13 +83,13 @@ fn setup_instancing(
     mut commands: Commands,
 ) {
     // Perspective camera
-    commands.spawn_bundle(Camera3dBundle {
+    commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(-50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
 
     // Directional Light
-    commands.spawn().insert_bundle(DirectionalLightBundle {
+    commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             illuminance: 4000.,
             ..default()
@@ -115,21 +111,22 @@ fn setup_instancing(
     });
 
     commands
-        .spawn()
-        .insert(Name::new("Boids Instance Slice"))
-        .insert_bundle(InstanceSliceBundle {
-            material: material_back.clone(),
-            mesh: mesh_cube.clone(),
-            mesh_instance_slice: InstanceSlice {
-                instance_count: 200,
+        .spawn((
+            Name::new("Boids Instance Slice"),
+            InstanceSliceBundle {
+                material: material_back.clone(),
+                mesh: mesh_cube.clone(),
+                mesh_instance_slice: InstanceSlice {
+                    instance_count: 200,
+                },
+                ..default()
             },
-            ..default()
-        })
+        ))
         .insert(BoidsInstances::default());
 }
 
 fn instance_compute_time(time: Res<Time>, mut query_uniform: Query<&mut BoidsInstances>) {
     for mut uniform in query_uniform.iter_mut() {
-        uniform.time = time.seconds_since_startup() as f32;
+        uniform.time = time.elapsed_seconds();
     }
 }

@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 use std::num::NonZeroU64;
 use std::{borrow::Cow, hash::Hash};
 
+use bevy::prelude::Resource;
 use bevy::{
     asset::load_internal_asset,
     prelude::{
@@ -94,7 +95,7 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Resource)]
 pub struct InstanceComputePipeline<T: InstanceCompute> {
     pub uniform_bind_group_layout: BindGroupLayout,
     pub instance_bind_group_layout: BindGroupLayout,
@@ -178,6 +179,7 @@ impl<T: InstanceCompute> Default for InstanceComputeNode<T> {
     }
 }
 
+#[derive(Resource)]
 struct InstanceComputeQueue<T: InstanceCompute>(Vec<InstanceComputeJob<T>>);
 
 struct InstanceComputeJob<T: InstanceCompute> {

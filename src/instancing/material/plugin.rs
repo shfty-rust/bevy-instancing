@@ -19,7 +19,7 @@ use bevy::{
     pbr::{AlphaMode, SetMeshViewBindGroup},
     prelude::{
         debug, default, AssetEvent, Assets, Commands, Deref, DerefMut, Entity, EventReader, Handle,
-        Image, Local, Mesh, ParallelSystemDescriptorCoercion, Res, ResMut,
+        Image, IntoSystemDescriptor, Local, Mesh, Res, ResMut, Resource,
     },
     render::{
         extract_component::ExtractComponentPlugin,
@@ -87,8 +87,11 @@ where
 {
     fn build(&self, app: &mut App) {
         app.add_asset::<M>()
-            .add_plugin(ExtractComponentPlugin::<Handle<M>>::default())
-            .add_plugin(ExtractComponentPlugin::<Handle<Mesh>>::default());
+            .add_plugin(ExtractComponentPlugin::<Handle<M>>::default());
+
+        if !app.is_plugin_added::<ExtractComponentPlugin<Handle<Mesh>>>() {
+            app.add_plugin(ExtractComponentPlugin::<Handle<Mesh>>::default());
+        }
 
         if let Ok(render_app) = app.get_sub_app_mut(RenderApp) {
             render_app
@@ -209,7 +212,7 @@ pub struct GpuInstancedMesh {
     pub key: InstancedMeshKey,
 }
 
-#[derive(Debug, Clone, Deref, DerefMut)]
+#[derive(Debug, Clone, Deref, DerefMut, Resource)]
 pub struct RenderMeshes {
     pub instanced_meshes: BTreeMap<Handle<Mesh>, GpuInstancedMesh>,
 }
@@ -686,6 +689,7 @@ pub struct PreparedMaterial<T: MaterialInstanced> {
     pub properties: MaterialProperties,
 }
 
+#[derive(Resource)]
 struct ExtractedMaterials<M: MaterialInstanced> {
     extracted: Vec<(Handle<M>, M)>,
     removed: Vec<Handle<M>>,
@@ -701,7 +705,14 @@ impl<M: MaterialInstanced> Default for ExtractedMaterials<M> {
 }
 
 /// Stores all prepared representations of [`Material`] assets for as long as they exist.
-pub type RenderMaterials<T> = HashMap<Handle<T>, PreparedMaterial<T>>;
+#[derive(Deref, DerefMut, Resource)]
+pub struct RenderMaterials<T: MaterialInstanced>(HashMap<Handle<T>, PreparedMaterial<T>>);
+
+impl<T: MaterialInstanced> Default for RenderMaterials<T> {
+    fn default() -> Self {
+        RenderMaterials(default())
+    }
+}
 
 /// This system extracts all created or modified assets of the corresponding [`Material`] type
 /// into the "render world".

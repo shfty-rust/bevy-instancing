@@ -84,13 +84,13 @@ fn setup_instancing(
     mut commands: Commands,
 ) {
     // Perspective camera
-    commands.spawn_bundle(Camera3dBundle {
+    commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(-50.0, 50.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
         ..default()
     });
 
     // Directional Light
-    commands.spawn().insert_bundle(DirectionalLightBundle {
+    commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             illuminance: 4000.,
             ..default()
@@ -123,81 +123,81 @@ fn setup_instancing(
         cull_mode: Some(Face::Front),
     });
 
-    commands
-        .spawn()
-        .insert(Name::new("Back Face Cube Instance Block"))
-        .insert_bundle(InstanceSliceBundle {
+    commands.spawn((
+        Name::new("Back Face Cube Instance Block"),
+        InstanceSliceBundle {
             material: material_back.clone(),
             mesh: mesh_cube.clone(),
             mesh_instance_slice: InstanceSlice {
                 instance_count: 200,
             },
             ..default()
-        })
-        .insert(RadialSineInstances {
+        },
+        RadialSineInstances {
             tint: Vec3::new(1.0, 1.0, 1.0),
             normal: Vec3::X,
             tangent: -Vec3::Y,
             ..default()
-        });
+        },
+    ));
 
-    commands
-        .spawn()
-        .insert(Name::new("Front Face Cube Instance Block"))
-        .insert_bundle(InstanceSliceBundle {
+    commands.spawn((
+        Name::new("Front Face Cube Instance Block"),
+        InstanceSliceBundle {
             material: material_front.clone(),
             mesh: mesh_cube.clone(),
             mesh_instance_slice: InstanceSlice {
                 instance_count: 200,
             },
             ..default()
-        })
-        .insert(RadialSineInstances {
+        },
+        RadialSineInstances {
             tint: Vec3::new(1.0, 0.0, 0.0),
             normal: -Vec3::X,
             tangent: Vec3::Y,
             ..default()
-        });
+        },
+    ));
 
-    commands
-        .spawn()
-        .insert(Name::new("Back Face Sphere Instance Block"))
-        .insert_bundle(InstanceSliceBundle {
+    commands.spawn((
+        Name::new("Back Face Sphere Instance Block"),
+        InstanceSliceBundle {
             material: material_back.clone(),
             mesh: mesh_sphere.clone(),
             mesh_instance_slice: InstanceSlice {
                 instance_count: 200,
             },
             ..default()
-        })
-        .insert(RadialSineInstances {
+        },
+        RadialSineInstances {
             tint: Vec3::new(0.0, 1.0, 0.0),
             normal: -Vec3::Z,
             tangent: -Vec3::Y,
             ..default()
-        });
+        },
+    ));
 
-    commands
-        .spawn()
-        .insert(Name::new("Front Face Sphere Instance Block"))
-        .insert_bundle(InstanceSliceBundle {
+    commands.spawn((
+        Name::new("Front Face Sphere Instance Block"),
+        InstanceSliceBundle {
             material: material_front.clone(),
             mesh: mesh_sphere.clone(),
             mesh_instance_slice: InstanceSlice {
                 instance_count: 200,
             },
             ..default()
-        })
-        .insert(RadialSineInstances {
+        },
+        RadialSineInstances {
             tint: Vec3::new(0.0, 0.0, 1.0),
             normal: Vec3::Z,
             tangent: Vec3::Y,
             ..default()
-        });
+        },
+    ));
 }
 
 fn instance_compute_time(time: Res<Time>, mut query_uniform: Query<&mut RadialSineInstances>) {
     for mut uniform in query_uniform.iter_mut() {
-        uniform.time = time.seconds_since_startup() as f32;
+        uniform.time = time.elapsed_seconds();
     }
 }

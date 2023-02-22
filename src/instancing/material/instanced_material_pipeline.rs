@@ -4,6 +4,7 @@ use bevy::{
     asset::{AssetServer, Handle},
     ecs::{prelude::World, world::FromWorld},
     pbr::MeshPipelineKey,
+    prelude::Resource,
     render::{
         mesh::MeshVertexBufferLayout,
         render_resource::{
@@ -54,6 +55,7 @@ where
     }
 }
 
+#[derive(Resource)]
 pub struct InstancedMaterialPipeline<M: MaterialInstanced> {
     pub instanced_mesh_pipeline: InstancedMeshPipeline,
     pub material_layout: BindGroupLayout,

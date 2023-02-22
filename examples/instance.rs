@@ -5,16 +5,13 @@ use bevy::{
     prelude::{
         default, info,
         shape::{Cube, Icosphere, Quad, Torus, UVSphere},
-        App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, Entity, EventWriter,
-        Handle, Local, Mesh, PerspectiveProjection, Query, Res, ResMut, SpatialBundle, Transform,
-        With,
+        App, AssetServer, Assets, Camera, Camera3dBundle, Color, Commands, EventWriter, Handle,
+        Mesh, PerspectiveProjection, Res, ResMut, SpatialBundle, Transform,
     },
     render::{
         camera::{Projection, RenderTarget},
         render_resource::Face,
-        view::VisibleEntities,
     },
-    time::Time,
     window::{CreateWindow, PresentMode, WindowDescriptor, WindowId},
     DefaultPlugins,
 };
@@ -213,10 +210,9 @@ fn setup_instancing(
             let mut y = 0;
 
             for material in basic_materials.iter() {
-                commands
-                    .spawn()
-                    .insert(Name::new("Basic Instance"))
-                    .insert_bundle(MeshInstanceBundle::<BasicMaterial> {
+                commands.spawn((
+                    Name::new("Basic Instance"),
+                    MeshInstanceBundle::<BasicMaterial> {
                         mesh: mesh.clone(),
                         material: material.clone(),
                         spatial_bundle: SpatialBundle {
@@ -229,15 +225,15 @@ fn setup_instancing(
                             ..default()
                         },
                         ..default()
-                    });
+                    },
+                ));
                 //.insert(NoFrustumCulling);
             }
 
             for material in custom_materials.iter() {
-                commands
-                    .spawn()
-                    .insert(Name::new(format!("Custom Instance ({x:}, {y:}, {z:})")))
-                    .insert_bundle(ColorInstanceBundle {
+                commands.spawn((
+                    Name::new(format!("Custom Instance ({x:}, {y:}, {z:})")),
+                    ColorInstanceBundle {
                         instance_bundle: MeshInstanceBundle {
                             mesh: mesh.clone(),
                             material: material.clone(),
@@ -253,17 +249,17 @@ fn setup_instancing(
                             ..default()
                         },
                         mesh_instance_color: color.into(),
-                    });
+                    },
+                ));
                 //.insert(NoFrustumCulling);
 
                 y += 1;
             }
 
             for material in texture_materials.iter() {
-                commands
-                    .spawn()
-                    .insert(Name::new(format!("Texture Instance ({x:}, {y:}, {z:})")))
-                    .insert_bundle(ColorInstanceBundle {
+                commands.spawn((
+                    Name::new(format!("Texture Instance ({x:}, {y:}, {z:})")),
+                    ColorInstanceBundle {
                         instance_bundle: MeshInstanceBundle {
                             mesh: mesh.clone(),
                             material: material.clone(),
@@ -279,7 +275,8 @@ fn setup_instancing(
                             ..default()
                         },
                         mesh_instance_color: color.into(),
-                    });
+                    },
+                ));
                 //.insert(NoFrustumCulling);
 
                 y += 1;
@@ -288,7 +285,7 @@ fn setup_instancing(
     }
 
     // Directional Light
-    commands.spawn().insert_bundle(DirectionalLightBundle {
+    commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             illuminance: 4000.,
             ..default()
@@ -313,7 +310,7 @@ fn setup_instancing(
         mesh_count * material_count * color_count
     );
 
-    commands.spawn_bundle(Camera3dBundle {
+    commands.spawn(Camera3dBundle {
         transform: Transform::from_xyz(50.0, 50.0, 50.0).looking_at(look_target, Vec3::Y),
         projection: Projection::Perspective(PerspectiveProjection {
             fov: 45.0f32.to_radians(),
@@ -338,7 +335,7 @@ fn setup_instancing(
         });
 
         // second window camera
-        commands.spawn_bundle(Camera3dBundle {
+        commands.spawn(Camera3dBundle {
             transform: Transform::from_xyz(50.0, 0.0, 50.0).looking_at(Vec3::ZERO, Vec3::Y),
             camera: Camera {
                 target: RenderTarget::Window(window_id),
@@ -352,4 +349,3 @@ fn setup_instancing(
         });
     }
 }
-

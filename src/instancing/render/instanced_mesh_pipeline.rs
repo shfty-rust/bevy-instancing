@@ -1,6 +1,6 @@
 use bevy::{
     pbr::{MeshPipeline, MeshPipelineKey},
-    prelude::{FromWorld, Shader, World},
+    prelude::{FromWorld, Shader, World, Resource},
     render::{
         mesh::MeshVertexBufferLayout,
         render_resource::{
@@ -15,7 +15,7 @@ use bevy::{
 use crate::prelude::INSTANCED_MESH_SHADER_HANDLE;
 
 /// Pipeline for rendering instanced meshes
-#[derive(Clone)]
+#[derive(Clone, Resource)]
 pub struct InstancedMeshPipeline {
     pub mesh_pipeline: MeshPipeline,
     pub instance_buffer_binding_type: BufferBindingType,

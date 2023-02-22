@@ -5,13 +5,14 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use bevy::prelude::{debug, Res, ResMut};
+use bevy::prelude::{debug, Res, ResMut, Resource};
 
 use crate::instancing::material::{
     material_instanced::MaterialInstanced,
     plugin::{GpuAlphaMode, InstancedMaterialBatchKey, MaterialBatch, RenderMaterials},
 };
 
+#[derive(Resource)]
 pub struct MaterialBatches<M: MaterialInstanced> {
     pub material_batches: BTreeMap<InstancedMaterialBatchKey<M>, MaterialBatch<M>>,
     _phantom: PhantomData<M>,

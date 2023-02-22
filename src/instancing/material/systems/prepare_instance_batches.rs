@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use bevy::{
     prelude::{
-        debug, default, info, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut, With,
+        debug, default, info, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut, Resource,
+        With,
     },
     render::{
         renderer::{RenderDevice, RenderQueue},
@@ -26,7 +27,7 @@ use crate::instancing::{
 
 use super::prepare_mesh_batches::MeshBatches;
 
-#[derive(Deref, DerefMut)]
+#[derive(Deref, DerefMut, Resource)]
 pub struct ViewInstanceData<M: MaterialInstanced> {
     pub instance_data: BTreeMap<Entity, BTreeMap<InstanceBatchKey<M>, GpuInstances<M>>>,
 }

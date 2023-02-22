@@ -4,7 +4,7 @@ use bevy::{
     reflect::TypeUuid,
 };
 
-use crate::prelude::{CustomMaterial, InstanceColor, ColorInstancePlugin, InstancedMaterialPlugin};
+use crate::prelude::{ColorInstancePlugin, CustomMaterial, InstanceColor, InstancedMaterialPlugin};
 
 pub const CUSTOM_SHADER_HANDLE: HandleUntyped =
     HandleUntyped::weak_from_u64(Shader::TYPE_UUID, 2832496304849745969);
@@ -18,8 +18,11 @@ impl Plugin for CustomMaterialPlugin {
         app.register_type::<InstanceColor>();
 
         app.add_asset::<CustomMaterial>()
-            .add_plugin(ColorInstancePlugin)
             .add_plugin(InstancedMaterialPlugin::<CustomMaterial>::default());
+
+        if !app.is_plugin_added::<ColorInstancePlugin>() {
+            app.add_plugin(ColorInstancePlugin);
+        }
 
         app.world
             .resource_mut::<Assets<CustomMaterial>>()
@@ -29,4 +32,3 @@ impl Plugin for CustomMaterialPlugin {
             );
     }
 }
-

@@ -1,6 +1,6 @@
 use bevy::{
     asset::load_internal_asset,
-    prelude::{App, HandleUntyped, ParallelSystemDescriptorCoercion, Plugin, Shader},
+    prelude::{App, HandleUntyped, IntoSystemDescriptor, Plugin, Shader},
     reflect::TypeUuid,
     render::{
         extract_component::ExtractComponentPlugin, render_asset::PrepareAssetLabel, RenderApp,

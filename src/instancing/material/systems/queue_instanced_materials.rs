@@ -52,7 +52,7 @@ pub fn system<M: MaterialInstanced>(
                 .material
                 .clone_weak();
 
-            let batch_entity = commands.spawn().insert(material).insert(key.clone()).id();
+            let batch_entity = commands.spawn((material, key.clone())).id();
 
             // Queue draw function
             let draw_function = match key.material_key.alpha_mode {

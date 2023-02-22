@@ -21,8 +21,11 @@ impl Plugin for TextureMaterialPlugin {
         );
 
         app.add_asset::<TextureMaterial>()
-            .add_plugin(ColorInstancePlugin)
             .add_plugin(InstancedMaterialPlugin::<TextureMaterial>::default());
+
+        if !app.is_plugin_added::<ColorInstancePlugin>() {
+            app.add_plugin(ColorInstancePlugin);
+        }
 
         app.world
             .resource_mut::<Assets<TextureMaterial>>()

@@ -37,7 +37,7 @@ pub fn system<M: MaterialInstanced>(
                 .instance_slice_ranges
                 .iter()
             {
-                commands.entity(*entity).insert_bundle((
+                commands.entity(*entity).insert((
                     *slice_range,
                     InstanceSliceTarget {
                         buffer: if let GpuInstances::Storage { buffer } = &instance_buffer_data {

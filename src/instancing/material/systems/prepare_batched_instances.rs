@@ -2,18 +2,19 @@ use std::{collections::BTreeMap, num::NonZeroU64};
 
 use bevy::{
     prelude::{
-        debug, default, info, info_span, Camera, Deref, DerefMut, Entity, Handle, Mesh, Query,
-        RemovedComponents, Res, ResMut, With,
+        debug, default, info, info_span, Deref, DerefMut, Entity, Handle, Mesh, Query, Res, ResMut,
+        Resource, With,
     },
     render::{
         render_resource::{BufferVec, ShaderSize},
         renderer::{RenderDevice, RenderQueue},
         view::{ExtractedView, VisibleEntities},
-        Extract,
     },
 };
 // use wgpu::{BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages};
-use bevy::render::render_resource::{BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages};
+use bevy::render::render_resource::{
+    BindGroupDescriptor, BindGroupEntry, BufferBinding, BufferUsages,
+};
 
 use crate::instancing::{
     indirect::{DrawCall, DrawOffsets, IndirectDraw},
@@ -31,7 +32,7 @@ use crate::instancing::{
 
 use super::{prepare_instance_batches::ViewInstanceData, prepare_mesh_batches::MeshBatches};
 
-#[derive(Deref, DerefMut)]
+#[derive(Deref, DerefMut, Resource)]
 pub struct ViewIndirectData<M: MaterialInstanced> {
     pub indirect_data: BTreeMap<Entity, BTreeMap<InstanceBatchKey<M>, Vec<BufferVec<u8>>>>,
 }

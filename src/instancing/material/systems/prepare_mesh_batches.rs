@@ -5,7 +5,7 @@ use crate::{
     prelude::{DrawIndexedIndirect, DrawIndirect},
 };
 use bevy::{
-    prelude::{debug, default, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut},
+    prelude::{debug, default, info_span, Deref, DerefMut, Handle, Mesh, Res, ResMut, Resource},
     render::{
         mesh::Indices,
         render_resource::BufferVec,
@@ -38,7 +38,7 @@ pub struct MeshBatch {
     pub indirect_data: GpuIndirectData,
 }
 
-#[derive(Default, Deref, DerefMut)]
+#[derive(Default, Deref, DerefMut, Resource)]
 pub struct MeshBatches {
     pub mesh_batches: BTreeMap<InstancedMeshKey, MeshBatch>,
 }
