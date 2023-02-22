@@ -14,6 +14,10 @@ wgpu = "*"
 name = "instance_compute"
 path = "examples/instance_slice/instance_compute.rs"
 
+[[example]]
+name = "boids"
+path = "examples/instance_slice/boids.rs"
+
 # Fast-compile config for crates in this workspace
 [profile.dev]
 opt-level = 0

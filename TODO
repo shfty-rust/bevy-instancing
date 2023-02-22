@@ -3,6 +3,12 @@ TODO: Specialized binding example for instance compute
         * Need to refactor InstanceCompute to allow bind group creation
           * Look over bevy specializers and see what's most appropriate
 
+TODO: Document everything, final organization pass to make bevy-idiomatic
+
+TODO: Fork bevy, open pull request
+
+> Future
+
 TODO: Implement StandardInstancedMaterial
       * Initial goal: Make pbr.wgsl work with instances
         * Should be able to encode most StandardMaterial params as instance data
@@ -24,7 +30,9 @@ TODO: Investigate equivalent to babylon.js 'thin instances' functionality
       * Ideally data should be updated on change to minimize overhead
         * This could benefit regular instances too
 
-NOTES: Transparency ordering
+> Notes
+
+NOTE: Transparency ordering
       * Currently, transparency ordering is only correct versus other instances with the
         same mesh within the same batch
         * This is down to sorting each batch into contiguous blocks of a given mesh,
