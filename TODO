@@ -3,16 +3,8 @@ TODO: Specialized binding example for instance compute
         * Need to refactor InstanceCompute to allow bind group creation
           * Look over bevy specializers and see what's most appropriate
 
-TODO: Document everything, final organization pass to make bevy-idiomatic
-
-TODO: Fork bevy, open pull request
-
-> Future
-
-TODO: Implement StandardInstancedMaterial
-      * Initial goal: Make pbr.wgsl work with instances
-        * Should be able to encode most StandardMaterial params as instance data
-      * Secondary goal: Make shadows work
+TODO: Documentation pass
+TODO: Refactor / organization pass to match bevy_render / bevy_pbr idioms
 
 FIXME: Instance buffer layout is incorrect under wasm
        * Instances draw, but with incorrect positions
@@ -22,6 +14,9 @@ FIXME: Instance buffer layout is incorrect under wasm
          * Experimented with explicitly specifying struct size and alignment, but makes no difference
          * Likely some unaccounted-for wgpu limit
 
+TODO: Implement StandardInstancedMaterial
+      * Should be much more feasible following the modularization of bevy_pbr
+
 TODO: Investigate equivalent to babylon.js 'thin instances' functionality
       * Similar to InstanceSlice; a contiguous block of instances that all draw together with no visibility culling
       * Primary use case is wasm, needs a low-overhead solution to instancing in the absence of compute
@@ -29,8 +24,6 @@ TODO: Investigate equivalent to babylon.js 'thin instances' functionality
         * Minus the ComputedVisibility?
       * Ideally data should be updated on change to minimize overhead
         * This could benefit regular instances too
-
-> Notes
 
 NOTE: Transparency ordering
       * Currently, transparency ordering is only correct versus other instances with the
