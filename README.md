@@ -2,7 +2,5 @@
 
 An indirect-instanced mesh renderer for the bevy game engine.
 
-This is WIP.
-A discussion about this (and other attempts at the same goal)
-can be found in Bevys own [_GPU Instancing_ issue](
+This repository can be considered experimental. Discussion about the issue it attempts to solve can be found at the [bevy issue tracker](
 https://github.com/bevyengine/bevy/issues/89#issuecomment-1197783076).
